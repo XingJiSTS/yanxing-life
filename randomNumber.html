@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random Number Generator & 3D Dice</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Three.js -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.1/build/three.min.js"></script>
+    <!-- GSAP for animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#7C3AED',
+                        accent: '#EC4899',
+                        dark: '#1E293B',
+                        light: '#F8FAFC',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        error: '#EF4444',
+                        info: '#3B82F6'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'bounce-slow': 'bounce 3s infinite',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .glass {
+                background: rgba(255, 255, 255, 0.25);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.18);
+            }
+            .glass-dark {
+                background: rgba(30, 41, 59, 0.75);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            .text-shadow-lg {
+                text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            }
+            .gradient-text {
+                @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary;
+            }
+            .gradient-bg {
+                @apply bg-gradient-to-br from-primary to-secondary;
+            }
+            .gradient-border {
+                @apply border-transparent bg-clip-padding bg-gradient-to-r from-primary to-secondary;
+            }
+            .dice-shadow {
+                filter: drop-shadow(0 10px 8px rgb(0 0 0 / 0.04)) drop-shadow(0 4px 3px rgb(0 0 0 / 0.1));
+            }
+        }
+        
+        /* Custom slider styles */
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Dice animation */
+        @keyframes roll {
+            0% { transform: rotateX(0deg) rotateY(0deg); }
+            25% { transform: rotateX(90deg) rotateY(90deg); }
+            50% { transform: rotateX(180deg) rotateY(180deg); }
+            75% { transform: rotateX(270deg) rotateY(270deg); }
+            100% { transform: rotateX(360deg) rotateY(360deg); }
+        }
+        
+        .dice-rolling {
+            animation: roll 1s ease-in-out infinite;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Theme transitions */
+        body {
+            transition: background-color 0.5s ease, color 0.5s ease;
+        }
+        
+        .theme-transition {
+            transition: background-color 0.5s ease, border-color 0.5s ease, color 0.5s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased text-light bg-gradient-to-br from-dark to-gray-900">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl md:text-5xl font-bold mb-2 gradient-text text-shadow-lg">Random Number Generator</h1>
+            <p class="text-lg text-gray-300">Generate random numbers with customizable range and precision, or roll 3D dice</p>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Control Panel -->
+            <div class="lg:col-span-1">
+                <div class="glass-dark rounded-2xl p-6 shadow-xl">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center">
+                        <i class="fa fa-sliders mr-2 text-primary"></i> Controls
+                    </h2>
+                    
+                    <!-- Theme Selector -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold mb-3">Theme</h3>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button id="theme-default" class="theme-btn w-full h-10 rounded-lg bg-gradient-to-r from-primary to-secondary ring-2 ring-white"></button>
+                            <button id="theme-light" class="theme-btn w-full h-10 rounded-lg bg-gradient-to-r from-blue-400 to-teal-300"></button>
+                            <button id="theme-dark" class="theme-btn w-full h-10 rounded-lg bg-gradient-to-r from-gray-700 to-gray-900"></button>
+                            <button id="theme-colorful" class="theme-btn w-full h-10 rounded-lg bg-gradient-to-r from-pink-500 to-yellow-500"></button>
+                        </div>
+                    </div>
+                    
+                    <!-- Mode Selector -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold mb-3">Mode</h3>
+                        <div class="flex rounded-lg overflow-hidden">
+                            <button id="mode-dice" class="mode-btn flex-1 py-3 px-4 text-center font-medium bg-primary text-white">
+                                <i class="fa fa-dice mr-2"></i>Dice
+                            </button>
+                            <button id="mode-number" class="mode-btn flex-1 py-3 px-4 text-center font-medium bg-gray-700 text-gray-300">
+                                <i class="fa fa-random mr-2"></i>Number
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Dice Settings -->
+                    <div id="dice-settings" class="mb-6">
+                        <h3 class="text-lg font-semibold mb-3">Dice Settings</h3>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Number of Dice</label>
+                            <div class="flex items-center">
+                                <button id="decrease-dice" class="w-10 h-10 rounded-l-lg bg-gray-700 flex items-center justify-center hover:bg-gray-600 transition">
+                                    <i class="fa fa-minus"></i>
+                                </button>
+                                <input type="number" id="dice-count" min="1" max="6" value="1" class="w-full h-10 px-4 bg-gray-800 border-y border-gray-600 text-center focus:outline-none focus:ring-2 focus:ring-primary">
+                                <button id="increase-dice" class="w-10 h-10 rounded-r-lg bg-gray-700 flex items-center justify-center hover:bg-gray-600 transition">
+                                    <i class="fa fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Dice Type</label>
+                            <select id="dice-type" class="w-full h-10 px-4 bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                                <option value="6">6-sided (D6)</option>
+                                <option value="4">4-sided (D4)</option>
+                                <option value="8">8-sided (D8)</option>
+                                <option value="10">10-sided (D10)</option>
+                                <option value="12">12-sided (D12)</option>
+                                <option value="20">20-sided (D20)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Number Generator Settings -->
+                    <div id="number-settings" class="mb-6 hidden">
+                        <h3 class="text-lg font-semibold mb-3">Number Settings</h3>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Minimum Value</label>
+                            <input type="number" id="min-value" value="1" step="1" class="w-full h-10 px-4 bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Maximum Value</label>
+                            <input type="number" id="max-value" value="100" step="1" class="w-full h-10 px-4 bg-gray-800 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Decimal Places</label>
+                            <div class="flex items-center">
+                                <button id="decrease-precision" class="w-10 h-10 rounded-l-lg bg-gray-700 flex items-center justify-center hover:bg-gray-600 transition">
+                                    <i class="fa fa-minus"></i>
+                                </button>
+                                <input type="number" id="precision" min="0" max="5" value="0" class="w-full h-10 px-4 bg-gray-800 border-y border-gray-600 text-center focus:outline-none focus:ring-2 focus:ring-primary">
+                                <button id="increase-precision" class="w-10 h-10 rounded-r-lg bg-gray-700 flex items-center justify-center hover:bg-gray-600 transition">
+                                    <i class="fa fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Quantity</label>
+                            <div class="flex items-center">
+                                <button id="decrease-quantity" class="w-10 h-10 rounded-l-lg bg-gray-700 flex items-center justify-center hover:bg-gray-600 transition">
+                                    <i class="fa fa-minus"></i>
+                                </button>
+                                <input type="number" id="quantity" min="1" max="10" value="1" class="w-full h-10 px-4 bg-gray-800 border-y border-gray-600 text-center focus:outline-none focus:ring-2 focus:ring-primary">
+                                <button id="increase-quantity" class="w-10 h-10 rounded-r-lg bg-gray-700 flex items-center justify-center hover:bg-gray-600 transition">
+                                    <i class="fa fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Generate Button -->
+                    <button id="generate-btn" class="w-full py-4 px-6 rounded-xl gradient-bg text-white font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 flex items-center justify-center">
+                        <i class="fa fa-play-circle mr-2"></i> Generate Random
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Display Area -->
+            <div class="lg:col-span-2">
+                <!-- Result Display -->
+                <div class="glass-dark rounded-2xl p-6 shadow-xl mb-6">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center">
+                        <i class="fa fa-trophy mr-2 text-primary"></i> Result
+                    </h2>
+                    
+                    <!-- Dice Display -->
+                    <div id="dice-display" class="flex flex-col items-center justify-center min-h-[300px]">
+                        <div id="dice-container" class="relative w-full h-[300px] flex items-center justify-center">
+                            <!-- 3D dice will be rendered here -->
+                            <div id="dice-placeholder" class="flex items-center justify-center">
+                                <div class="w-32 h-32 md:w-48 md:h-48 rounded-xl bg-gray-800 border-4 border-gray-700 flex items-center justify-center">
+                                    <span class="text-6xl md:text-8xl font-bold text-gray-600">?</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="dice-result" class="mt-6 text-center hidden">
+                            <h3 class="text-xl font-semibold mb-2">Total:</h3>
+                            <p id="dice-total" class="text-4xl md:text-5xl font-bold gradient-text"></p>
+                        </div>
+                    </div>
+                    
+                    <!-- Number Display -->
+                    <div id="number-display" class="flex flex-col items-center justify-center min-h-[300px] hidden">
+                        <div id="number-placeholder" class="flex items-center justify-center">
+                            <div class="w-full max-w-md h-32 md:h-48 rounded-xl bg-gray-800 border-4 border-gray-700 flex items-center justify-center">
+                                <span class="text-6xl md:text-8xl font-bold text-gray-600">?</span>
+                            </div>
+                        </div>
+                        <div id="number-result" class="mt-6 w-full max-w-md hidden">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Random numbers will be displayed here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- History -->
+                <div class="glass-dark rounded-2xl p-6 shadow-xl">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold flex items-center">
+                            <i class="fa fa-history mr-2 text-primary"></i> History
+                        </h2>
+                        <button id="clear-history" class="text-sm text-gray-400 hover:text-white transition flex items-center">
+                            <i class="fa fa-trash mr-1"></i> Clear
+                        </button>
+                    </div>
+                    
+                    <div id="history-list" class="max-h-[200px] overflow-y-auto">
+                        <div class="text-center text-gray-500 py-8">
+                            <i class="fa fa-info-circle text-2xl mb-2"></i>
+                            <p>No history yet. Generate some random numbers!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Footer -->
+        <footer class="mt-12 text-center text-gray-400 text-sm">
+            <p>© 2026 Random Number Generator. All rights reserved.</p>
+        </footer>
+    </div>
+    
+    <script>
+        // DOM Elements
+        const themeBtns = document.querySelectorAll('.theme-btn');
+        const modeBtns = document.querySelectorAll('.mode-btn');
+        const diceSettings = document.getElementById('dice-settings');
+        const numberSettings = document.getElementById('number-settings');
+        const diceDisplay = document.getElementById('dice-display');
+        const numberDisplay = document.getElementById('number-display');
+        const generateBtn = document.getElementById('generate-btn');
+        const dicePlaceholder = document.getElementById('dice-placeholder');
+        const diceResult = document.getElementById('dice-result');
+        const diceTotal = document.getElementById('dice-total');
+        const numberPlaceholder = document.getElementById('number-placeholder');
+        const numberResult = document.getElementById('number-result');
+        const historyList = document.getElementById('history-list');
+        const clearHistoryBtn = document.getElementById('clear-history');
+        
+        // Dice Controls
+        const decreaseDiceBtn = document.getElementById('decrease-dice');
+        const increaseDiceBtn = document.getElementById('increase-dice');
+        const diceCountInput = document.getElementById('dice-count');
+        const diceTypeSelect = document.getElementById('dice-type');
+        
+        // Number Controls
+        const minValueInput = document.getElementById('min-value');
+        const maxValueInput = document.getElementById('max-value');
+        const decreasePrecisionBtn = document.getElementById('decrease-precision');
+        const increasePrecisionBtn = document.getElementById('increase-precision');
+        const precisionInput = document.getElementById('precision');
+        const decreaseQuantityBtn = document.getElementById('decrease-quantity');
+        const increaseQuantityBtn = document.getElementById('increase-quantity');
+        const quantityInput = document.getElementById('quantity');
+        
+        // State
+        let currentMode = 'dice';
+        let isGenerating = false;
+        let history = JSON.parse(localStorage.getItem('randomHistory')) || [];
+        
+        // Themes
+        const themes = {
+            default: {
+                primary: '#4F46E5',
+                secondary: '#7C3AED',
+                background: 'from-dark to-gray-900'
+            },
+            light: {
+                primary: '#3B82F6',
+                secondary: '#14B8A6',
+                background: 'from-blue-50 to-teal-50'
+            },
+            dark: {
+                primary: '#6B7280',
+                secondary: '#374151',
+                background: 'from-gray-900 to-black'
+            },
+            colorful: {
+                primary: '#EC4899',
+                secondary: '#F59E0B',
+                background: 'from-pink-900 to-yellow-900'
+            }
+        };
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateHistoryDisplay();
+            setupEventListeners();
+            initializeThreeJS();
+        });
+        
+        // Event Listeners
+        function setupEventListeners() {
+            // Theme buttons
+            themeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const theme = btn.id.replace('theme-', '');
+                    applyTheme(theme);
+                    
+                    // Update active theme button
+                    themeBtns.forEach(b => b.classList.remove('ring-2', 'ring-white'));
+                    btn.classList.add('ring-2', 'ring-white');
+                });
+            });
+            
+            // Mode buttons
+            modeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const mode = btn.id.replace('mode-', '');
+                    switchMode(mode);
+                    
+                    // Update active mode button
+                    modeBtns.forEach(b => {
+                        b.classList.remove('bg-primary', 'text-white');
+                        b.classList.add('bg-gray-700', 'text-gray-300');
+                    });
+                    btn.classList.remove('bg-gray-700', 'text-gray-300');
+                    btn.classList.add('bg-primary', 'text-white');
+                });
+            });
+            
+            // Dice controls
+            decreaseDiceBtn.addEventListener('click', () => {
+                const current = parseInt(diceCountInput.value);
+                if (current > 1) {
+                    diceCountInput.value = current - 1;
+                }
+            });
+            
+            increaseDiceBtn.addEventListener('click', () => {
+                const current = parseInt(diceCountInput.value);
+                if (current < 6) {
+                    diceCountInput.value = current + 1;
+                }
+            });
+            
+            // Number controls
+            decreasePrecisionBtn.addEventListener('click', () => {
+                const current = parseInt(precisionInput.value);
+                if (current > 0) {
+                    precisionInput.value = current - 1;
+                }
+            });
+            
+            increasePrecisionBtn.addEventListener('click', () => {
+                const current = parseInt(precisionInput.value);
+                if (current < 5) {
+                    precisionInput.value = current + 1;
+                }
+            });
+            
+            decreaseQuantityBtn.addEventListener('click', () => {
+                const current = parseInt(quantityInput.value);
+                if (current > 1) {
+                    quantityInput.value = current - 1;
+                }
+            });
+            
+            increaseQuantityBtn.addEventListener('click', () => {
+                const current = parseInt(quantityInput.value);
+                if (current < 10) {
+                    quantityInput.value = current + 1;
+                }
+            });
+            
+            // Generate button
+            generateBtn.addEventListener('click', generateRandom);
+            
+            // Clear history button
+            clearHistoryBtn.addEventListener('click', () => {
+                history = [];
+                localStorage.setItem('randomHistory', JSON.stringify(history));
+                updateHistoryDisplay();
+            });
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    generateRandom();
+                }
+            });
+        }
+        
+        // Apply Theme
+        function applyTheme(themeName) {
+            const theme = themes[themeName];
+            if (!theme) return;
+            
+            // Update CSS variables
+            document.documentElement.style.setProperty('--primary-color', theme.primary);
+            document.documentElement.style.setProperty('--secondary-color', theme.secondary);
+            
+            // Update background
+            const body = document.body;
+            body.className = body.className.replace(/bg-gradient-to-br from-\w+(-\w+)? to-\w+(-\w+)?/, `bg-gradient-to-br ${theme.background}`);
+            
+            // Update gradient text and background
+            const gradientElements = document.querySelectorAll('.gradient-text, .gradient-bg');
+            gradientElements.forEach(el => {
+                if (el.classList.contains('gradient-text')) {
+                    el.style.backgroundImage = `linear-gradient(to right, ${theme.primary}, ${theme.secondary})`;
+                }
+                if (el.classList.contains('gradient-bg')) {
+                    el.style.backgroundImage = `linear-gradient(to right, ${theme.primary}, ${theme.secondary})`;
+                }
+            });
+            
+            // Save theme preference
+            localStorage.setItem('preferredTheme', themeName);
+        }
+        
+        // Switch Mode
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            if (mode === 'dice') {
+                diceSettings.classList.remove('hidden');
+                numberSettings.classList.add('hidden');
+                diceDisplay.classList.remove('hidden');
+                numberDisplay.classList.add('hidden');
+                generateBtn.innerHTML = '<i class="fa fa-play-circle mr-2"></i> Roll Dice';
+            } else {
+                diceSettings.classList.add('hidden');
+                numberSettings.classList.remove('hidden');
+                diceDisplay.classList.add('hidden');
+                numberDisplay.classList.remove('hidden');
+                generateBtn.innerHTML = '<i class="fa fa-play-circle mr-2"></i> Generate Number';
+            }
+            
+            // Reset displays
+            resetDisplays();
+        }
+        
+        // Generate Random
+        function generateRandom() {
+            if (isGenerating) return;
+            isGenerating = true;
+            
+            // Disable button temporarily
+            generateBtn.disabled = true;
+            generateBtn.classList.add('opacity-70', 'cursor-not-allowed');
+            
+            resetDisplays();
+            
+            if (currentMode === 'dice') {
+                rollDice();
+            } else {
+                generateRandomNumbers();
+            }
+            
+            // Re-enable button after animation
+            setTimeout(() => {
+                generateBtn.disabled = false;
+                generateBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+                isGenerating = false;
+            }, 1500);
+        }
+        
+        // Roll Dice
+        function rollDice() {
+            const diceCount = parseInt(diceCountInput.value);
+            const diceSides = parseInt(diceTypeSelect.value);
+            
+            // Show rolling animation
+            const dicePlaceholder = document.getElementById('dice-placeholder');
+            dicePlaceholder.classList.add('dice-rolling');
+            
+            // Generate random values
+            const results = [];
+            for (let i = 0; i < diceCount; i++) {
+                results.push(Math.floor(Math.random() * diceSides) + 1);
+            }
+            
+            const total = results.reduce((sum, val) => sum + val, 0);
+            
+            // Simulate rolling time
+            setTimeout(() => {
+                // Hide placeholder and show result
+                dicePlaceholder.classList.remove('dice-rolling');
+                dicePlaceholder.classList.add('hidden');
+                diceResult.classList.remove('hidden');
+                
+                // Display result
+                diceTotal.textContent = total;
+                
+                // Add to history
+                const historyItem = {
+                    type: 'dice',
+                    timestamp: new Date().toISOString(),
+                    config: {
+                        count: diceCount,
+                        sides: diceSides
+                    },
+                    results: results,
+                    total: total
+                };
+                
+                addToHistory(historyItem);
+                
+                // Animate result
+                animateValue(diceTotal, 0, total, 500);
+            }, 1000);
+        }
+        
+        // Generate Random Numbers
+        function generateRandomNumbers() {
+            const min = parseFloat(minValueInput.value);
+            const max = parseFloat(maxValueInput.value);
+            const precision = parseInt(precisionInput.value);
+            const quantity = parseInt(quantityInput.value);
+            
+            // Validate inputs
+            if (min >= max) {
+                alert('Minimum value must be less than maximum value');
+                return;
+            }
+            
+            // Generate random numbers
+            const results = [];
+            for (let i = 0; i < quantity; i++) {
+                const random = Math.random() * (max - min) + min;
+                results.push(parseFloat(random.toFixed(precision)));
+            }
+            
+            // Simulate generation time
+            setTimeout(() => {
+                // Hide placeholder and show result
+                numberPlaceholder.classList.add('hidden');
+                numberResult.classList.remove('hidden');
+                
+                // Clear previous results
+                numberResult.innerHTML = '';
+                
+                // Display results
+                results.forEach((result, index) => {
+                    const resultElement = document.createElement('div');
+                    resultElement.className = 'bg-gray-800 rounded-lg p-4 text-center';
+                    resultElement.innerHTML = `
+                        <h4 class="text-sm text-gray-400 mb-1">Number ${index + 1}</h4>
+                        <p class="text-2xl font-bold gradient-text">${result}</p>
+                    `;
+                    numberResult.appendChild(resultElement);
+                    
+                    // Animate result
+                    const resultValue = resultElement.querySelector('p');
+                    animateValue(resultValue, 0, result, 500, index * 100);
+                });
+                
+                // Add to history
+                const historyItem = {
+                    type: 'number',
+                    timestamp: new Date().toISOString(),
+                    config: {
+                        min: min,
+                        max: max,
+                        precision: precision,
+                        quantity: quantity
+                    },
+                    results: results
+                };
+                
+                addToHistory(historyItem);
+            }, 500);
+        }
+        
+        // Reset Displays
+        function resetDisplays() {
+            // Dice display
+            dicePlaceholder.classList.remove('hidden', 'dice-rolling');
+            diceResult.classList.add('hidden');
+            
+            // Number display
+            numberPlaceholder.classList.remove('hidden');
+            numberResult.classList.add('hidden');
+        }
+        
+        // Add to History
+        function addToHistory(item) {
+            history.unshift(item);
+            
+            // Limit history size
+            if (history.length > 20) {
+                history.pop();
+            }
+            
+            // Save to localStorage
+            localStorage.setItem('randomHistory', JSON.stringify(history));
+            
+            // Update display
+            updateHistoryDisplay();
+        }
+        
+        // Update History Display
+        function updateHistoryDisplay() {
+            historyList.innerHTML = '';
+            
+            if (history.length === 0) {
+                historyList.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fa fa-info-circle text-2xl mb-2"></i>
+                        <p>No history yet. Generate some random numbers!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            history.forEach(item => {
+                const historyElement = document.createElement('div');
+                historyElement.className = 'p-3 border-b border-gray-700 last:border-0';
+                
+                const date = new Date(item.timestamp);
+                const timeString = date.toLocaleTimeString();
+                
+                if (item.type === 'dice') {
+                    historyElement.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="font-medium">${item.config.count}x D${item.config.sides}</p>
+                                <p class="text-sm text-gray-400">Results: ${item.results.join(', ')}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-bold text-lg gradient-text">${item.total}</p>
+                                <p class="text-xs text-gray-500">${timeString}</p>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    historyElement.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="font-medium">${item.config.quantity} number${item.config.quantity > 1 ? 's' : ''}</p>
+                                <p class="text-sm text-gray-400">Range: ${item.config.min} to ${item.config.max}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-bold text-lg gradient-text">${item.results.join(', ')}</p>
+                                <p class="text-xs text-gray-500">${timeString}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                historyList.appendChild(historyElement);
+            });
+        }
+        
+        // Animate Value
+        function animateValue(element, start, end, duration, delay = 0) {
+            setTimeout(() => {
+                let startTimestamp = null;
+                const step = (timestamp) => {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                    const value = progress * (end - start) + start;
+                    element.textContent = end % 1 === 0 ? Math.floor(value) : value.toFixed(2);
+                    
+                    if (progress < 1) {
+                        window.requestAnimationFrame(step);
+                    } else {
+                        element.textContent = end;
+                    }
+                };
+                window.requestAnimationFrame(step);
+            }, delay);
+        }
+        
+        // Three.js Initialization
+        let scene, camera, renderer, diceMesh;
+        
+        function initializeThreeJS() {
+            // Create scene
+            scene = new THREE.Scene();
+            
+            // Create camera
+            camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+            camera.position.z = 5;
+            
+            // Create renderer
+            const container = document.getElementById('dice-container');
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setClearColor(0x000000, 0);
+            
+            // Add renderer to DOM
+            // container.appendChild(renderer.domElement);
+            
+            // Add ambient light
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            
+            // Add directional light
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+            
+            // Create dice
+            createDice();
+            
+            // Animation loop
+            function animate() {
+                requestAnimationFrame(animate);
+                renderer.render(scene, camera);
+            }
+            
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                if (!renderer) return;
+                
+                const container = document.getElementById('dice-container');
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(width, height);
+            });
+            
+            // Start animation
+            animate();
+        }
+        
+        function createDice() {
+            // Create dice geometry
+            const geometry = new THREE.BoxGeometry(2, 2, 2);
+            
+            // Create dice material with dots
+            const materials = [
+                new THREE.MeshPhongMaterial({ color: 0xffffff }), // Front
+                new THREE.MeshPhongMaterial({ color: 0xffffff }), // Back
+                new THREE.MeshPhongMaterial({ color: 0xffffff }), // Top
+                new THREE.MeshPhongMaterial({ color: 0xffffff }), // Bottom
+                new THREE.MeshPhongMaterial({ color: 0xffffff }), // Right
+                new THREE.MeshPhongMaterial({ color: 0xffffff })  // Left
+            ];
+            
+            // Create mesh
+            diceMesh = new THREE.Mesh(geometry, materials);
+            scene.add(diceMesh);
+            
+            // Position dice
+            diceMesh.position.set(0, 0, 0);
+        }
+        
+        // Load saved theme
+        const savedTheme = localStorage.getItem('preferredTheme') || 'default';
+        applyTheme(savedTheme);
+        document.getElementById(`theme-${savedTheme}`).classList.add('ring-2', 'ring-white');
+    </script>
+</body>
+</html>
