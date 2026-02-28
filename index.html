@@ -23,62 +23,144 @@
             padding: 20px;
             color: #342a2a;
             position: relative;
+            /* 防止emoji轨迹元素超出页面 */
+            overflow: hidden;
         }
 
         .container {
             text-align: center;
-            max-width: auto;
+            max-width: 100%; /* 修正无效的auto值 */
             width: 100%;
-            
+            /* 让容器在最上层，不被轨迹元素遮挡 */
+            /* position: relative; */
+            /* z-index: 10; */
         }
 
         h1 {
-            font-size: 28px;
+            font-size: 60px;
             margin-bottom: 3vh;
             font-weight: 600;
         }
 
-        p {
-            font-size: 16px;
+        .emoji { /* 给emoji加类名，方便选中 */
+            font-size: 160px;
             color: #7d8797;
             margin-bottom: 30px;
-            line-height: 1.6;
+            line-height: 1.2;
+            cursor: pointer; /* 鼠标悬浮显示手型 */
+            transition: transform 0.2s;
+        }
+
+        .emoji:hover {
+            transform: scale(1.1); /* 悬浮放大，提示可点击 */
         }
 
         .btn {
-            
+            font-weight: 500;
             display: block;
-            border:1px,solid#342a2a;
+            border: 5px solid #342a2a; /* 修正边框语法错误 */
             color: #342a2a;
-            margin: 1vh;
-            background-color:#ffffff;
+            margin: 1vh auto; /* 居中按钮 */
+            background-color: #ffffff;
             text-decoration: none;
-            font-size: 16px;
+            font-size: 48px;
             padding: 12px 24px;
             border-radius: 8px;
-            transition: background 0.1s;
+            transition: background 0.5s, transform 0.4s, color 0.5s;
+            width:50%; 
         }
 
         .btn:hover {
-            background-color: #888888;
+            transform: scale(0.95);
+        }
+        
+        /* 轨迹emoji的样式 */
+        .emoji-trail {
+            position: absolute;
+            font-size: 40px;
+            pointer-events: none; /* 不阻挡鼠标事件 */
+            z-index: 5; /* 低于容器，不遮挡按钮/标题 */
+            /* 动画：上浮+渐隐+旋转 */
+            animation: trail-fade .5s ease-out forwards;
+        }
+
+        /* 轨迹动画关键帧 */
+        @keyframes trail-fade {
+            0% {
+                opacity: 1;
+                transform: translateY(0) rotate(0deg)scale(0.7);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-50px) rotate(45deg)scale(0.1);
+                /* 超出可视区域后移除元素 */
+                pointer-events: none;
+            }
         }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>欢迎来到衍星的星空</h1>
+        <h1></h1>
+        <!-- 给emoji添加类名emoji -->
+        <p class="emoji">🥰</p>
         
         <a href="randomNumber.html" class="btn btn-random">随机数生成器</a>
-         <!-- 新增：衍星控制器 入口 -->
         <a href="controller.html" class="btn btn-control">操控衍星</a>
         <a href="suchas.html" class="btn btn-achieve">个人档案</a>
     </div>
+
+    <script>
+        // 核心变量
+        let isDrawing = false; // 是否开启轨迹绘制
+        const emojiElement = document.querySelector('.emoji');
+        const emojiText = emojiElement.textContent.trim(); // 获取当前emoji内容
+        const body = document.body;
+
+        // 点击emoji切换绘制状态
+        emojiElement.addEventListener('click', () => {
+            isDrawing = !isDrawing;
+            // 给emoji加视觉反馈（选中时变色）
+            emojiElement.style.color = isDrawing ? '#ff6b9d' : '#7d8797';
+            emojiElement.style.transform = isDrawing ? 'scale(1.15)' : 'scale(1)';
+        });
+
+        // 监听鼠标移动事件
+        body.addEventListener('mousemove', (e) => {
+            // 只有开启绘制时才创建轨迹
+            if (!isDrawing) return;
+
+            // 创建新的emoji元素
+            const trailEmoji = document.createElement('span');
+            trailEmoji.className = 'emoji-trail';
+            trailEmoji.textContent = emojiText;
+
+            // 设置位置为鼠标当前坐标（微调，让emoji在鼠标下方）
+            trailEmoji.style.left = `${e.clientX - 20}px`;
+            trailEmoji.style.top = `${e.clientY - 20}px`;
+
+            // 随机微调大小和旋转，让轨迹更自然
+            const randomScale = 0.8 + Math.random() * 0.4; // 0.8-1.2倍大小
+            trailEmoji.style.transform = `scale(${randomScale})`;
+
+            // 添加到页面
+            body.appendChild(trailEmoji);
+
+            // 动画结束后移除元素，避免内存占用
+            setTimeout(() => {
+                trailEmoji.remove();
+            }, 1500); // 和动画时长保持一致
+        });
+
+        // 可选：点击空白处关闭轨迹
+        body.addEventListener('click', (e) => {
+            if (e.target !== emojiElement && isDrawing) {
+                isDrawing = false;
+                emojiElement.style.color = '#7d8797';
+                emojiElement.style.transform = 'scale(1)';
+            }
+        });
+    </script>
 </body>
 </html>
-
-
-
-
-
-
