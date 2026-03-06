@@ -1,211 +1,358 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-    <meta charset="UTF-8">
-    <title>Keplerian Saturn - Ultra 3D</title>
-    <style>
-        body { margin: 0; background: #000; overflow: hidden; color: #fff; font-family: sans-serif; }
-        #loading-overlay { 
-            position: absolute; inset: 0; background: #000; z-index: 1000;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-        }
-        .start-btn { 
-            padding: 15px 40px; font-size: 1.2rem; background: transparent; 
-            border: 1px solid #fff; color: #fff; cursor: pointer; transition: 0.3s;
-        }
-        .start-btn:hover { background: #fff; color: #000; }
-        #video-preview { 
-            position: absolute; bottom: 20px; left: 20px; width: 200px; height: 150px; 
-            border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); transform: scaleX(-1);
-            background: #111;
-        }
-        #ui-layer { position: absolute; top: 20px; right: 20px; z-index: 100; }
-    </style>
+<meta charset="UTF-8">
+<title>Starsky v10 — Saturn Gesture System</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+<style>
+body{
+margin:0;
+overflow:hidden;
+background:black;
+font-family:sans-serif;
+}
+
+#info{
+position:absolute;
+top:10px;
+left:10px;
+color:white;
+font-size:14px;
+opacity:.7;
+line-height:1.5;
+}
+
+video{
+display:none;
+}
+</style>
 </head>
+
 <body>
 
-<div id="loading-overlay">
-    <h2>Keplerian Saturn 3D</h2>
-    <p>点击按钮启动摄像头并加载粒子系统</p>
-    <button class="start-btn" onclick="startApp()">进入星系</button>
+<div id="info">
+Starsky v10<br>
+move hand → rotate<br>
+pinch → zoom<br>
+spread fingers → ring<br>
+fist → grab spin<br>
+open hand → storm
 </div>
 
-<div id="ui-layer">
-    <button style="background:none; border:1px solid #555; color:#888; cursor:pointer;" onclick="document.documentElement.requestFullscreen()">全屏</button>
-</div>
-
-<video id="video-preview" autoplay playsinline></video>
-<div id="container"></div>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-
-<script id="vertexShader" type="x-shader/x-vertex">
-    uniform float uTime;
-    uniform float uScale;
-    attribute float aSize;
-    attribute float aDistance;
-    attribute float aSpeed;
-    attribute vec3 aRandom;
-    varying vec3 vColor;
-    varying float vAlpha;
-
-    // 经典的噪声算法用于“炸开”效果
-    float random (vec3 st) {
-        return fract(sin(dot(st.xyz, vec3(12.9898,78.233,45.164))) * 43758.5453123);
-    }
-
-    void main() {
-        // 1. 开普勒第三定律：速度与半径的平方根成反比
-        float keplerSpeed = aSpeed * (1.0 / sqrt(aDistance + 0.1));
-        float angle = uTime * keplerSpeed;
-        
-        // 初始位置（核心球体 vs 土星环）
-        vec3 pos;
-        if(aDistance < 2.5) {
-            pos = aRandom * 1.8; // 核心
-        } else {
-            pos = vec3(cos(angle) * aDistance, (aRandom.y * 0.2), sin(angle) * aDistance); // 环
-        }
-
-        // 2. 手势缩放
-        pos *= uScale;
-
-        // 3. 临场感：当靠近屏幕（uScale大）时，叠加无规则高频噪声
-        float chaosTrigger = smoothstep(3.5, 5.5, uScale);
-        if(chaosTrigger > 0.1) {
-            float noiseStrength = chaosTrigger * 8.0;
-            pos.x += (random(pos + uTime) - 0.5) * noiseStrength;
-            pos.y += (random(pos.yzx + uTime) - 0.5) * noiseStrength;
-            pos.z += (random(pos.zxy + uTime) - 0.5) * noiseStrength;
-        }
-
-        vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-        
-        // 4. 物理亮度控制：随缩放变亮
-        float brightness = clamp(uScale * 0.35, 0.2, 1.5);
-        vColor = vec3(0.95, 0.85, 0.7) * (1.5 / (aDistance + 1.0)) * brightness;
-        vAlpha = clamp(1.0 - chaosTrigger * 0.4, 0.2, 1.0);
-
-        gl_Position = projectionMatrix * mvPosition;
-        gl_PointSize = aSize * (400.0 / -mvPosition.z);
-    }
-</script>
-
-<script id="fragmentShader" type="x-shader/x-fragment">
-    varying vec3 vColor;
-    varying float vAlpha;
-    void main() {
-        float d = distance(gl_PointCoord, vec2(0.5));
-        if(d > 0.5) discard;
-        float glow = pow(1.0 - d*2.0, 2.0);
-        gl_FragColor = vec4(vColor, glow * vAlpha);
-    }
-</script>
+<video class="input_video"></video>
 
 <script>
-    let scene, camera, renderer, particles, material;
-    let handScale = 1.0;
-    let isStarted = false;
 
-    function initThree() {
-        scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
-        camera.position.set(0, 12, 20);
-        camera.lookAt(0, 0, 0);
+/* =========================
+   THREE.JS WORLD
+========================= */
 
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setClearColor(0x000000, 1);
-        document.getElementById('container').appendChild(renderer.domElement);
+let scene = new THREE.Scene()
 
-        const count = 120000;
-        const geometry = new THREE.BufferGeometry();
-        const positions = new Float32Array(count * 3);
-        const sizes = new Float32Array(count);
-        const distances = new Float32Array(count);
-        const speeds = new Float32Array(count);
-        const randoms = new Float32Array(count * 3);
+let camera = new THREE.PerspectiveCamera(
+60,
+window.innerWidth/window.innerHeight,
+0.1,
+10000
+)
 
-        for(let i=0; i<count; i++) {
-            let d = Math.random() > 0.4 ? (4 + Math.random() * 8) : (Math.random() * 2.4);
-            distances[i] = d;
-            speeds[i] = 1.5 + Math.random() * 2.0;
-            sizes[i] = Math.random() * 3.0 + 1.0;
-            
-            let rVec = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
-            randoms[i*3] = rVec.x; randoms[i*3+1] = rVec.y; randoms[i*3+2] = rVec.z;
-        }
+camera.position.z = 120
 
-        geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
-        geometry.setAttribute('aDistance', new THREE.BufferAttribute(distances, 1));
-        geometry.setAttribute('aSpeed', new THREE.BufferAttribute(speeds, 1));
-        geometry.setAttribute('aRandom', new THREE.BufferAttribute(randoms, 3));
+let renderer = new THREE.WebGLRenderer({antialias:true})
+renderer.setSize(window.innerWidth,window.innerHeight)
 
-        material = new THREE.ShaderMaterial({
-            uniforms: { uTime: { value: 0 }, uScale: { value: 1.0 } },
-            vertexShader: document.getElementById('vertexShader').textContent,
-            fragmentShader: document.getElementById('fragmentShader').textContent,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false
-        });
+document.body.appendChild(renderer.domElement)
 
-        particles = new THREE.Points(geometry, material);
-        scene.add(particles);
-    }
+window.addEventListener("resize",()=>{
 
-    async function startApp() {
-        document.getElementById('loading-overlay').style.display = 'none';
-        initThree();
-        setupHandTracking();
-        animate();
-    }
+camera.aspect = window.innerWidth/window.innerHeight
+camera.updateProjectionMatrix()
+renderer.setSize(window.innerWidth,window.innerHeight)
 
-    function setupHandTracking() {
-        const hands = new Hands({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-        });
+})
 
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5 });
+/* =========================
+   SATURN
+========================= */
 
-        hands.onResults(results => {
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const lm = results.multiHandLandmarks[0];
-                // 拇指(4)与食指(8)距离
-                const d = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
-                let target = THREE.MathUtils.mapLinear(d, 0.03, 0.35, 0.5, 6.0);
-                handScale += (target - handScale) * 0.15;
-            } else {
-                handScale += (1.0 - handScale) * 0.05;
-            }
-        });
+let group = new THREE.Group()
+scene.add(group)
 
-        const videoElement = document.getElementById('video-preview');
-        const cam = new Camera(videoElement, {
-            onFrame: async () => { await hands.send({image: videoElement}); },
-            width: 640, height: 480
-        });
-        cam.start();
-    }
+let saturnGeo = new THREE.SphereGeometry(18,128,128)
 
-    function animate() {
-        requestAnimationFrame(animate);
-        const t = performance.now() * 0.0008;
-        material.uniforms.uTime.value = t;
-        material.uniforms.uScale.value = handScale;
-        
-        particles.rotation.y = t * 0.1;
-        renderer.render(scene, camera);
-    }
+let saturnMat = new THREE.MeshStandardMaterial({
 
-    window.addEventListener('resize', () => {
-        if(!camera) return;
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+color:0xd8c28c,
+roughness:.9,
+metalness:.05
+
+})
+
+let saturn = new THREE.Mesh(saturnGeo,saturnMat)
+group.add(saturn)
+
+/* =========================
+   RINGS
+========================= */
+
+let ringGeo = new THREE.BufferGeometry()
+
+let ringCount = 12000
+let ringPos = new Float32Array(ringCount*3)
+
+for(let i=0;i<ringCount;i++){
+
+let r = 28 + Math.random()*22
+let a = Math.random()*Math.PI*2
+
+ringPos[i*3]   = Math.cos(a)*r
+ringPos[i*3+1] = (Math.random()-.5)*.5
+ringPos[i*3+2] = Math.sin(a)*r
+
+}
+
+ringGeo.setAttribute("position",new THREE.BufferAttribute(ringPos,3))
+
+let ringMat = new THREE.PointsMaterial({
+
+color:0xe8d6aa,
+size:.4
+
+})
+
+let ring = new THREE.Points(ringGeo,ringMat)
+group.add(ring)
+
+/* =========================
+   STARS
+========================= */
+
+let starGeo = new THREE.BufferGeometry()
+
+let starCount = 50000
+let starPos = new Float32Array(starCount*3)
+
+for(let i=0;i<starCount;i++){
+
+let r = 1500*Math.random()
+
+let theta = Math.random()*Math.PI*2
+let phi = Math.random()*Math.PI
+
+starPos[i*3]   = r*Math.sin(phi)*Math.cos(theta)
+starPos[i*3+1] = r*Math.sin(phi)*Math.sin(theta)
+starPos[i*3+2] = r*Math.cos(phi)
+
+}
+
+starGeo.setAttribute("position",new THREE.BufferAttribute(starPos,3))
+
+let starMat = new THREE.PointsMaterial({
+
+size:1.3,
+color:0xffffff
+
+})
+
+let stars = new THREE.Points(starGeo,starMat)
+scene.add(stars)
+
+/* =========================
+   LIGHT
+========================= */
+
+let sun = new THREE.PointLight(0xffffff,1.3)
+sun.position.set(200,200,200)
+
+scene.add(sun)
+
+scene.add(new THREE.AmbientLight(0x222222))
+
+/* =========================
+   PHYSICS
+========================= */
+
+let rotX=0
+let rotY=0
+
+let velX=0
+let velY=0
+
+let scale=1
+let targetScale=1
+
+let ringWidth=1
+
+let chaos=0
+
+/* =========================
+   RENDER LOOP
+========================= */
+
+function animate(){
+
+requestAnimationFrame(animate)
+
+/* inertia */
+
+rotX += velX
+rotY += velY
+
+velX *= .95
+velY *= .95
+
+group.rotation.x = rotX
+group.rotation.y = rotY
+
+scale += (targetScale-scale)*.08
+group.scale.set(scale,scale,scale)
+
+ring.scale.set(ringWidth,1,ringWidth)
+
+saturn.material.emissiveIntensity = chaos
+
+chaos *= .92
+
+renderer.render(scene,camera)
+
+}
+
+animate()
+
+/* =========================
+   HAND TRACKING
+========================= */
+
+const videoElement=document.querySelector(".input_video")
+
+const hands=new Hands({
+locateFile:(file)=>{
+return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+}
+})
+
+hands.setOptions({
+
+maxNumHands:2,
+modelComplexity:1,
+minDetectionConfidence:.7,
+minTrackingConfidence:.7
+
+})
+
+/* =========================
+   GESTURE HELPERS
+========================= */
+
+function dist(a,b){
+
+return Math.sqrt(
+(a.x-b.x)**2+
+(a.y-b.y)**2
+)
+
+}
+
+function isFist(h){
+
+return h[8].y>h[6].y &&
+h[12].y>h[10].y &&
+h[16].y>h[14].y
+
+}
+
+function isOpen(h){
+
+return h[8].y<h[6].y &&
+h[12].y<h[10].y &&
+h[16].y<h[14].y &&
+h[20].y<h[18].y
+
+}
+
+/* =========================
+   HAND CONTROL
+========================= */
+
+let lastX=0
+let lastY=0
+
+hands.onResults(results=>{
+
+if(!results.multiHandLandmarks) return
+
+let h = results.multiHandLandmarks[0]
+
+let palm = h[9]
+
+/* rotation */
+
+let dx = palm.x - lastX
+let dy = palm.y - lastY
+
+velY += dx*4
+velX += dy*4
+
+/* pinch zoom */
+
+let pinch = dist(h[4],h[8])
+targetScale = .5 + pinch*6
+
+/* ring control */
+
+let spread = Math.abs(h[8].x - h[12].x)
+ringWidth = 1 + spread*3
+
+/* depth zoom */
+
+targetScale += palm.z*3
+
+/* grab boost */
+
+if(isFist(h)){
+
+velY += dx*15
+velX += dy*15
+
+}
+
+/* storm */
+
+if(isOpen(h)){
+
+chaos = 1.5
+
+}
+
+lastX = palm.x
+lastY = palm.y
+
+})
+
+/* =========================
+   CAMERA
+========================= */
+
+const cam=new Camera(videoElement,{
+
+onFrame:async()=>{
+
+await hands.send({image:videoElement})
+
+},
+
+width:640,
+height:480
+
+})
+
+cam.start()
+
 </script>
+
 </body>
 </html>
