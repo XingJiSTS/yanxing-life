@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLO26x 机损特征检测平台 - YanXing</title>
+    <style>
+        /* 页面基础科技感样式 */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0d1117; /* 深色背景，契合 AI 主题 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 顶部返回导航栏 */
+        .navbar {
+            background-color: #161b22;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .back-btn {
+            color: #58a6ff;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            transition: color 0.2s;
+        }
+
+        .back-btn:hover {
+            color: #8bc2ff;
+        }
+
+        .nav-title {
+            color: #c9d1d9;
+            margin-left: 20px;
+            font-size: 14px;
+        }
+
+        /* 嵌入的 Gradio 容器 */
+        .iframe-wrapper {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: transparent;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="navbar">
+            <a href="index.html" class="back-btn">← 返回主页</a>
+            <span class="nav-title">🤖 正在调用远程 Hugging Face 算力托管的 YOLO26x 模型...</span>
+        </div>
+
+        <div class="iframe-wrapper">
+            <iframe 
+                src="https://yanxingxingxing-mechabare.hf.space" 
+                allow="accelerometer; ambient-light-sensor; camera; microphone; geolocation; gyroscope; magnetometer; midi; payment; usb; vr; xr-spatial-tracking"
+                sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads"
+            ></iframe>
+        </div>
+    </div>
+
+</body>
+</html>
