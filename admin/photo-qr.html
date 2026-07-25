@@ -14,17 +14,23 @@
     #img-preview { width:100%;border-radius:8px;border:2px solid #342a2a; }
     #qrcode { margin: 30px auto; text-align: center; }
     .hidden { display: none !important; }
+    .tip-text {
+      color: #666;
+      text-align: center;
+      margin: 8px 0 20px;
+    }
   </style>
 </head>
 <body>
   <div id="mainContent">
     <h2>上传照片，生成分享二维码</h2>
+    <p class="tip-text">可单选1张生成单图码，多选2张及以上自动生成相册码</p>
     <div class="upload-box" onclick="document.getElementById('file-input').click()">
-      <p>点击选择图片 / 拖拽图片到此</p>
-      <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp">
+      <p>点击选择图片 / 拖拽图片到此（支持多选）</p>
+      <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp" multiple>
     </div>
     <div id="preview-box">
-      <h3>上传图片预览</h3>
+      <h3>图片预览（首张）</h3>
       <img id="img-preview">
     </div>
     <div id="qrcode"></div>
@@ -32,7 +38,7 @@
 
   <script>
     const WORKER_URL = "https://photo-upload-worker.abcd20100234.workers.dev/";
-    // 页面加载校验授权，未登录跳转登录页
+    // 权限校验拦截
     function checkAuth(){
       const authFlag = localStorage.getItem("photoSystemAuth");
       if(authFlag !== "pass"){
@@ -43,12 +49,11 @@
 
     const fileInput = document.getElementById("file-input");
 
-    // 选择文件后上传
     fileInput.addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+      const fileList = Array.from(e.target.files);
+      if (fileList.length === 0) return;
 
-      // 本地图片预览逻辑
+      // 首张图片预览
       const previewBox = document.getElementById("preview-box");
       const imgPreview = document.getElementById("img-preview");
       const reader = new FileReader();
@@ -56,35 +61,57 @@
         imgPreview.src = event.target.result;
         previewBox.style.display = "block";
       }
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(fileList[0]);
 
-      if (file.size > 50 * 1024 * 1024) {
-        alert("图片不能超过50MB");
-        return;
+      // 单张/多张区分
+      const isAlbum = fileList.length > 1;
+      let albumId = "";
+      if(isAlbum){
+        // 生成相册唯一ID
+        albumId = Date.now() + "_" + Math.random().toString(36).slice(2);
       }
-      // 生成随机文件名防止重名
-      const ext = file.name.split(".").pop();
-      const fileName = Date.now() + "_" + Math.random().toString(36).slice(2) + "." + ext;
+
+      // 限制单张最大5MB
+      for(const file of fileList){
+        if (file.size > 5 * 1024 * 1024) {
+          alert("其中一张图片超过5MB限制");
+          return;
+        }
+      }
 
       try {
-        const res = await fetch(WORKER_URL + fileName, {
-          method: "PUT",
-          headers: {
-            "X-Upload-Key": "040403",
-            "Content-Type": file.type
-          },
-          body: file
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data);
+        // 循环上传所有图片
+        let shareUrl = "";
+        for(const file of fileList){
+          const ext = file.name.split(".").pop();
+          const fileName = Date.now() + "_" + Math.random().toString(36).slice(2) + "." + ext;
+          // 上传图片，携带相册标识
+          const res = await fetch(`${WORKER_URL}${fileName}`, {
+            method: "PUT",
+            headers: {
+              "X-Upload-Key": "040403",
+              "Content-Type": file.type,
+              "X-Album-Id": albumId
+            },
+            body: file
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data);
+          // 仅最后一张记录分享链接
+          if(isAlbum){
+            shareUrl = `https://yanxing.life/share/album?albumId=${albumId}`;
+          }else{
+            shareUrl = data.url;
+          }
+        }
 
         // 生成二维码
         document.getElementById("qrcode").innerHTML = "";
-        QRCode.toCanvas(data.url, { width: 300 }, (err, canvas) => {
+        QRCode.toCanvas(shareUrl, { width: 300 }, (err, canvas) => {
           if (err) console.error(err);
           document.getElementById("qrcode").appendChild(canvas);
         });
-        alert("上传成功！下方二维码可分享给路人");
+        alert(`上传成功！共${fileList.length}张图，${isAlbum ? '相册二维码' : '单图二维码'}`);
       } catch (err) {
         console.error(err);
         alert("上传失败：" + err.message);
