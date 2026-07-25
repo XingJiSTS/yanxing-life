@@ -105,11 +105,8 @@
             0% { opacity: 1; transform: translate(0, 0) scale(0.7); }
             100% { opacity: 0; transform: translate(0, -40px) rotate(30deg) scale(0.2); }
         }
-        /* 权限区块控制 */
-        .auth-only {
-            display: none;
-        }
-        .auth-hide {
+        /* 仅照片相关按钮，未登录时隐藏 */
+        .photo-auth-btn {
             display: none;
         }
     </style>
@@ -120,18 +117,20 @@
         <h1>衍星Life</h1>
         <p class="emoji">🥰</p>
         
-        <!-- 未登录仅显示这个按钮 -->
-        <a href="/auth/login" class="btn auth-hide" id="loginBtn">进入照片系统</a>
+        <!-- 完全公开，所有人无需登录直接访问 -->
+        <a href="randomNumber.html" class="btn">随机数生成器</a>
+        <a href="controller.html" class="btn">操控衍星</a>
+        <a href="mechabare_detect.html" class="btn">机损特征检测</a>
 
-        <!-- 授权后才展示全部功能 -->
-        <div class="auth-only" id="authBox">
-            <a href="randomNumber.html" class="btn">随机数生成器</a>
-            <a href="controller.html" class="btn">操控衍星</a>
-            <a href="mechabare_detect.html" class="btn">机损特征检测</a>
+        <!-- 仅登录后才显示的两个照片功能按钮 -->
+        <div class="photo-auth-btn" id="photoBox">
             <a href="/admin/photo-qr" class="btn">路人照片上传</a>
             <a href="/share/gallery" class="btn">最近上传图库</a>
-            <a href="javascript:logout()" class="btn" style="border-color:#ff6b9d;color:#ff6b9d;">退出登录</a>
+            <a href="javascript:logout()" class="btn" style="border-color:#ff6b9d;color:#ff6b9d;">退出照片权限</a>
         </div>
+
+        <!-- 未登录时只显示这个按钮，跳转到密钥验证页 -->
+        <a href="/auth/login" class="btn" id="photoLoginBtn">进入照片上传/图库</a>
     </div>
 
     <script>
@@ -140,29 +139,29 @@
         const emojiText = emojiElement.textContent.trim();
         const WORKER_URL = "https://photo-upload-worker.abcd20100234.workers.dev/";
 
-        // 全局权限校验
+        // 权限判断：只控制照片相关按钮
         function checkAuth() {
             const authFlag = localStorage.getItem("photoSystemAuth");
-            const loginBtn = document.getElementById("loginBtn");
-            const authBox = document.getElementById("authBox");
+            const photoBox = document.getElementById("photoBox");
+            const photoLoginBtn = document.getElementById("photoLoginBtn");
             if(authFlag === "pass"){
-                authBox.style.display = "block";
-                loginBtn.style.display = "none";
+                photoBox.style.display = "block";
+                photoLoginBtn.style.display = "none";
             }else{
-                authBox.style.display = "none";
-                loginBtn.style.display = "block";
+                photoBox.style.display = "none";
+                photoLoginBtn.style.display = "block";
             }
         }
-        // 退出登录
+        // 清除照片登录凭证
         function logout(){
             localStorage.removeItem("photoSystemAuth");
             location.reload();
         }
 
-        // 初始化权限
+        // 页面初始化校验权限
         checkAuth();
 
-        // 原有emoji轨迹逻辑不变
+        // 原有emoji拖拽轨迹逻辑完全保留不变
         const toggleDrawing = (e) => {
             e.stopPropagation();
             isDrawing = !isDrawing;
