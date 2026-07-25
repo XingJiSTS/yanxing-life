@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/admin/photo-qr",
+      "destination": "/admin/photo-qr.html"
+    },
+    {
+      "source": "/share/img/:id",
+      "destination": "/share/img.html?id=:id"
+    }
+  ]
+}
