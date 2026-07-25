@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>照片系统登录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background: #f7f9fc;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: system-ui;
+            padding: 20px;
+        }
+        .login-card {
+            background: #fff;
+            padding: 40px 30px;
+            border-radius: 16px;
+            border: 3px solid #342a2a;
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
+        h2 {
+            margin-bottom: 30px;
+            color: #342a2a;
+        }
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 18px;
+            border: 2px solid #999;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            font-size: 20px;
+            background: #342a2a;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        button:active {
+            transform: scale(0.97);
+        }
+        .back-home {
+            display: inline-block;
+            margin-top: 24px;
+            color: #7d8797;
+            text-decoration: none;
+        }
+        .tip-error {
+            color: #ff4444;
+            margin-bottom: 16px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h2>照片系统权限验证</h2>
+        <div class="tip-error" id="errorTip">密钥错误，请重新输入</div>
+        <input type="text" id="keyInput" placeholder="请输入访问密钥">
+        <button onclick="submitAuth()">确认验证</button>
+        <a href="/" class="back-home">返回主页</a>
+    </div>
+
+    <script>
+        const WORKER_URL = "https://photo-upload-worker.abcd20100234.workers.dev/";
+        async function submitAuth(){
+            const inputKey = document.getElementById("keyInput").value.trim();
+            const errorTip = document.getElementById("errorTip");
+            if(!inputKey){
+                errorTip.style.display = "block";
+                errorTip.textContent = "请输入密钥";
+                return;
+            }
+            try {
+                // 把密钥发送给Worker后端校验
+                const res = await fetch(`${WORKER_URL}auth-check`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ inputKey })
+                });
+                const data = await res.json();
+                if(data.success){
+                    // 校验通过，写入授权标记，跳转主页
+                    localStorage.setItem("photoSystemAuth", "pass");
+                    location.href = "/";
+                }else{
+                    errorTip.style.display = "block";
+                    errorTip.textContent = "密钥错误，请重新输入";
+                }
+            } catch (err) {
+                errorTip.style.display = "block";
+                errorTip.textContent = "网络异常，校验失败";
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+</html>
