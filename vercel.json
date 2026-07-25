@@ -8,7 +8,6 @@
       "source": "/share/img/:id",
       "destination": "/share/img.html?id=:id"
     },
-    // 新增图库路由
     {
       "source": "/share/gallery",
       "destination": "/share/gallery.html"
