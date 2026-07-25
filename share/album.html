@@ -6,11 +6,10 @@ const pageNum = document.getElementById("pageNum");
 let imgList = [];
 let currentIndex = 0;
 
-// 获取当前相册所有图片（增加3秒超时中断）
 async function loadAlbumImages(){
   const params = new URLSearchParams(location.search);
   const albumId = params.get("albumId");
-  // 无相册ID，修正页面底色
+
   if(!albumId){
     document.body.style.background = "#f7f9fc";
     document.body.innerHTML = `
@@ -20,22 +19,19 @@ async function loadAlbumImages(){
     </div>`;
     return;
   }
+
   try {
-    // 3秒超时，防止无限加载卡死
     const abortCtrl = new AbortController();
     setTimeout(() => abortCtrl.abort(), 3000);
 
     const res = await fetch(`${WORKER_URL}list`, {
       signal: abortCtrl,
-      headers: {
-        "Accept": "application/json"
-      }
+      headers: { "Accept": "application/json" }
     });
 
     if (!res.ok) throw new Error("接口请求异常");
     const data = await res.json();
     const allFiles = data.files || [];
-    // 筛选当前相册图片
     imgList = allFiles.filter(file => file.albumId === albumId).sort((a,b)=>a.time - b.time);
     
     if(imgList.length === 0){
@@ -53,7 +49,6 @@ async function loadAlbumImages(){
   } catch(err){
     document.body.style.background = "#f7f9fc";
     let tipText = "相册加载失败，请刷新页面";
-    // 区分超时/网络错误
     if(err.name === "AbortError") tipText = "加载超时，网络不佳请重试";
     document.body.innerHTML = `
     <div style="color:#342a2a;margin:auto;text-align:center;padding:40px 20px;font-size:20px;">
@@ -64,7 +59,7 @@ async function loadAlbumImages(){
   }
 }
 
-// 渲染图片轮播（已修复src空值问题）
+// 修复完成的渲染函数
 function renderImages(){
   swiperWrap.innerHTML = "";
   imgList.forEach((item,idx)=>{
@@ -76,7 +71,6 @@ function renderImages(){
   })
 }
 
-// 更新页码
 function updatePage(){
   pageNum.innerText = `${currentIndex + 1} / ${imgList.length}`;
   document.querySelectorAll(".img-item").forEach((el,idx)=>{
@@ -84,7 +78,6 @@ function updatePage(){
   })
 }
 
-// 左右滑动切换
 function bindTouch(){
   let startX = 0;
   swiperWrap.addEventListener("touchstart", e=>{
