@@ -13,6 +13,10 @@
       "destination": "/share/gallery.html"
     },
     {
+      "source": "/share/album",
+      "destination": "/share/album.html"
+    },
+    {
       "source": "/auth/login",
       "destination": "/auth/login.html"
     }
