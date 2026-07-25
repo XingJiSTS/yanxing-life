@@ -1,11 +1,4 @@
-// 权限拦截
-function checkAuth(){
-    const authFlag = localStorage.getItem("photoSystemAuth");
-    if(authFlag !== "pass"){
-        location.href = "/auth/login";
-    }
-}
-checkAuth();
+
 
 const WORKER_URL = "https://photo.yanxing.life/";
 const BUCKET_DOMAIN = "https://passer-by-image.yanxing.life";
