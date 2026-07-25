@@ -11,6 +11,10 @@
     {
       "source": "/share/gallery",
       "destination": "/share/gallery.html"
+    },
+    {
+      "source": "/auth/login",
+      "destination": "/auth/login.html"
     }
   ]
 }
