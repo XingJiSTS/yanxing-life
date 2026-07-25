@@ -67,6 +67,14 @@
   <div class="empty-tip" id="emptyTip">暂无上传图片</div>
 
   <script>
+    // 页面加载权限校验
+    function checkAuth(){
+        const authFlag = localStorage.getItem("photoSystemAuth");
+        if(authFlag !== "pass"){
+            location.href = "/auth/login";
+        }
+    }
+checkAuth();
     const BUCKET_DOMAIN = "https://passer-by-image.yanxing.life";
     const WORKER_URL = "https://photo-upload-worker.abcd20100234.workers.dev/";
     const galleryWrap = document.getElementById("gallery");
