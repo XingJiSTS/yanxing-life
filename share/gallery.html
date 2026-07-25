@@ -27,22 +27,21 @@
       margin:0 auto 30px;
       padding:10px 24px;
       border:3px solid #342a2a;
-      background-color: #ffffff;
       border-radius:12px;
       text-decoration:none;
       color:#342a2a;
       font-size:20px;
     }
+    /* 核心布局：网格2px间隙，无画框 */
     .gallery-wrap {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap:16px;
+      gap: 2px; /* 仅2px方形分割间隙，无任何边框 */
       max-width:1200px;
       margin:0 auto;
     }
     .img-card {
-      border:2px solid #342a2a;
-      border-radius:10px;
+      /* 完全移除边框、圆角画框 */
       overflow:hidden;
       background:#fff;
     }
@@ -67,20 +66,20 @@
   <div class="empty-tip" id="emptyTip">暂无上传图片</div>
 
   <script>
-    // 页面加载权限校验
+    // 权限拦截
     function checkAuth(){
         const authFlag = localStorage.getItem("photoSystemAuth");
         if(authFlag !== "pass"){
             location.href = "/auth/login";
         }
     }
-checkAuth();
+    checkAuth();
+
     const BUCKET_DOMAIN = "https://passer-by-image.yanxing.life";
     const WORKER_URL = "https://photo-upload-worker.abcd20100234.workers.dev/";
     const galleryWrap = document.getElementById("gallery");
     const emptyTip = document.getElementById("emptyTip");
 
-    // 读取R2存储桶全部文件
     async function loadAllImages() {
       try {
         const res = await fetch(WORKER_URL + "list");
@@ -90,16 +89,22 @@ checkAuth();
         if(fileList.length === 0) return;
         emptyTip.style.display = "none";
 
-        // 按上传时间倒序（最新图片在前）
+        // 全部图片按上传时间倒序，忽略相册分组
         fileList.sort((a,b) => b.time - a.time);
 
-        fileList.forEach(fileName => {
+        fileList.forEach(fileItem => {
           const card = document.createElement("div");
           card.className = "img-card";
-          const imgUrl = `${BUCKET_DOMAIN}/${fileName}`;
+          const imgUrl = `${BUCKET_DOMAIN}/${fileItem.name}`;
           card.innerHTML = `<img src="${imgUrl}" loading="lazy">`;
-          // 点击跳转原图分享页
-          card.onclick = () => window.open(`/share/img?id=${fileName}`, "_blank");
+          // 单图跳转原图页，相册图跳转相册页
+          card.onclick = () => {
+            if(fileItem.albumId){
+              window.open(`/share/album?albumId=${fileItem.albumId}`, "_blank");
+            }else{
+              window.open(`/share/img?id=${fileItem.name}`, "_blank");
+            }
+          };
           galleryWrap.appendChild(card);
         })
       } catch(err) {
