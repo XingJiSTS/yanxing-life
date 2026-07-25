@@ -13,33 +13,16 @@
     #preview-box { margin:20px auto;max-width:400px;display:none; }
     #img-preview { width:100%;border-radius:8px;border:2px solid #342a2a; }
     #qrcode { margin: 30px auto; text-align: center; }
-    .key-modal {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-      display: flex; align-items: center; justify-content: center;
-    }
-    .modal-inner { background: white; padding: 30px; border-radius: 10px; width: 90%; max-width: 400px; }
-    input { width: 100%; padding: 10px; box-sizing: border-box; margin: 10px 0; font-size: 16px; }
-    button { padding: 10px 24px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; }
     .hidden { display: none !important; }
   </style>
 </head>
 <body>
-  <!-- 密钥弹窗 -->
-  <div class="key-modal" id="keyModal">
-    <div class="modal-inner">
-      <h3>请输入上传密钥</h3>
-      <input type="text" id="keyInput" placeholder="输入密钥">
-      <button onclick="checkKey()">确认</button>
-    </div>
-  </div>
-
-  <div id="mainContent" class="hidden">
+  <div id="mainContent">
     <h2>上传照片，生成分享二维码</h2>
     <div class="upload-box" onclick="document.getElementById('file-input').click()">
       <p>点击选择图片 / 拖拽图片到此</p>
       <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp">
     </div>
-    <!-- 预览框放到mainContent内部，正确位置 -->
     <div id="preview-box">
       <h3>上传图片预览</h3>
       <img id="img-preview">
@@ -48,33 +31,17 @@
   </div>
 
   <script>
-    // ========== 配置区，修改为你自己的信息 ==========
     const WORKER_URL = "https://photo-upload-worker.abcd20100234.workers.dev/";
-    const AUTH_KEY = "040403"; // 和Worker代码内密钥保持一致
-    // =====================================================
-
-    const keyModal = document.getElementById("keyModal");
-    const mainContent = document.getElementById("mainContent");
-    const fileInput = document.getElementById("file-input");
-
-    // 读取本地存储的密钥
-    const savedKey = localStorage.getItem("uploadKey");
-    if (savedKey === AUTH_KEY) {
-      keyModal.classList.add("hidden");
-      mainContent.classList.remove("hidden");
-    }
-
-    // 校验密钥
-    function checkKey() {
-      const inputVal = document.getElementById("keyInput").value.trim();
-      if (inputVal === AUTH_KEY) {
-        localStorage.setItem("uploadKey", inputVal);
-        keyModal.classList.add("hidden");
-        mainContent.classList.remove("hidden");
-      } else {
-        alert("密钥错误");
+    // 页面加载校验授权，未登录跳转登录页
+    function checkAuth(){
+      const authFlag = localStorage.getItem("photoSystemAuth");
+      if(authFlag !== "pass"){
+        location.href = "/auth/login";
       }
     }
+    checkAuth();
+
+    const fileInput = document.getElementById("file-input");
 
     // 选择文件后上传
     fileInput.addEventListener("change", async (e) => {
@@ -103,7 +70,7 @@
         const res = await fetch(WORKER_URL + fileName, {
           method: "PUT",
           headers: {
-            "X-Upload-Key": AUTH_KEY,
+            "X-Upload-Key": "040403",
             "Content-Type": file.type
           },
           body: file
