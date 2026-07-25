@@ -10,7 +10,6 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            /* 防止移动端点击出现蓝色高亮框 */
             -webkit-tap-highlight-color: transparent;
         }
 
@@ -25,20 +24,20 @@
             padding: 20px;
             color: #342a2a;
             position: relative;
-            overflow: hidden; /* 防止轨迹溢出 */
-            touch-action: none; /* 优化移动端触摸，防止拖动时页面刷新 */
+            overflow: hidden;
+            touch-action: none;
         }
 
         .container {
             text-align: center;
             width: 100%;
-            max-width: 600px; /* 限制大屏下的最大宽度 */
+            max-width: 600px;
             position: relative; 
             z-index: 10;
         }
 
         h1 {
-            font-size: clamp(24px, 8vw, 60px); /* 响应式字体：最小24，随屏变，最大60 */
+            font-size: clamp(24px, 8vw, 60px);
             margin-bottom: 2vh;
             font-weight: 600;
         }
@@ -60,20 +59,19 @@
         .btn {
             font-weight: 500;
             display: block;
-            border: 3px solid #342a2a; /* 缩小了边框厚度更精致 */
+            border: 3px solid #342a2a;
             color: #342a2a;
             margin: 12px auto;
             background-color: #ffffff;
             text-decoration: none;
-            font-size: 24px; /* 默认手机端字体大小 */
+            font-size: 24px;
             padding: 12px 20px;
             border-radius: 12px;
             transition: all 0.3s ease;
-            width: 85%; /* 手机端按钮加宽，方便点击 */
+            width: 85%;
             max-width: 400px;
         }
 
-        /* 平板和电脑端适配 */
         @media (min-width: 768px) {
             .btn {
                 font-size: 32px;
@@ -83,7 +81,6 @@
             .emoji { margin-bottom: 30px; }
         }
 
-        /* 电脑大屏适配 */
         @media (min-width: 1024px) {
             .btn {
                 font-size: 36px;
@@ -96,7 +93,6 @@
             background-color: #f0f0f0;
         }
 
-        /* 轨迹样式 */
         .emoji-trail {
             position: absolute;
             font-size: 30px;
@@ -109,6 +105,13 @@
             0% { opacity: 1; transform: translate(0, 0) scale(0.7); }
             100% { opacity: 0; transform: translate(0, -40px) rotate(30deg) scale(0.2); }
         }
+        /* 权限区块控制 */
+        .auth-only {
+            display: none;
+        }
+        .auth-hide {
+            display: none;
+        }
     </style>
 </head>
 
@@ -117,19 +120,49 @@
         <h1>衍星Life</h1>
         <p class="emoji">🥰</p>
         
-        <a href="randomNumber.html" class="btn">随机数生成器</a>
-        <a href="controller.html" class="btn">操控衍星</a>
-        <a href="mechabare_detect.html" class="btn">机损特征检测</a>
-        <a href="/admin/photo-qr" class="btn">分享照片</a>
-        <a href="/share/gallery.html" class="btn">最近的分享</a>
+        <!-- 未登录仅显示这个按钮 -->
+        <a href="/auth/login" class="btn auth-hide" id="loginBtn">进入照片系统</a>
+
+        <!-- 授权后才展示全部功能 -->
+        <div class="auth-only" id="authBox">
+            <a href="randomNumber.html" class="btn">随机数生成器</a>
+            <a href="controller.html" class="btn">操控衍星</a>
+            <a href="mechabare_detect.html" class="btn">机损特征检测</a>
+            <a href="/admin/photo-qr" class="btn">路人照片上传</a>
+            <a href="/share/gallery" class="btn">最近上传图库</a>
+            <a href="javascript:logout()" class="btn" style="border-color:#ff6b9d;color:#ff6b9d;">退出登录</a>
+        </div>
     </div>
 
     <script>
         let isDrawing = false;
         const emojiElement = document.querySelector('.emoji');
         const emojiText = emojiElement.textContent.trim();
+        const WORKER_URL = "https://photo-upload-worker.abcd20100234.workers.dev/";
 
-        // 切换状态
+        // 全局权限校验
+        function checkAuth() {
+            const authFlag = localStorage.getItem("photoSystemAuth");
+            const loginBtn = document.getElementById("loginBtn");
+            const authBox = document.getElementById("authBox");
+            if(authFlag === "pass"){
+                authBox.style.display = "block";
+                loginBtn.style.display = "none";
+            }else{
+                authBox.style.display = "none";
+                loginBtn.style.display = "block";
+            }
+        }
+        // 退出登录
+        function logout(){
+            localStorage.removeItem("photoSystemAuth");
+            location.reload();
+        }
+
+        // 初始化权限
+        checkAuth();
+
+        // 原有emoji轨迹逻辑不变
         const toggleDrawing = (e) => {
             e.stopPropagation();
             isDrawing = !isDrawing;
@@ -138,37 +171,25 @@
         };
 
         emojiElement.addEventListener('click', toggleDrawing);
-        // 针对触摸屏的点击优化
-        emojiElement.addEventListener('touchstart', (e) => {
-            // 防止触发模拟鼠标点击
-        });
+        emojiElement.addEventListener('touchstart', (e) => {});
 
-        // 通用创建轨迹函数
         function createTrail(x, y) {
             if (!isDrawing) return;
-
             const trailEmoji = document.createElement('span');
             trailEmoji.className = 'emoji-trail';
             trailEmoji.textContent = emojiText;
             trailEmoji.style.left = `${x - 15}px`;
             trailEmoji.style.top = `${y - 15}px`;
-
             document.body.appendChild(trailEmoji);
             setTimeout(() => trailEmoji.remove(), 600);
         }
 
-        // 鼠标移动监听
-        window.addEventListener('mousemove', (e) => {
-            createTrail(e.clientX, e.clientY);
-        });
-
-        // 触摸移动监听 (适配手机/平板)
+        window.addEventListener('mousemove', (e) => createTrail(e.clientX, e.clientY));
         window.addEventListener('touchmove', (e) => {
             const touch = e.touches[0];
             createTrail(touch.clientX, touch.clientY);
         }, { passive: true });
 
-        // 点击空白关闭
         window.addEventListener('click', (e) => {
             if (e.target !== emojiElement && isDrawing) {
                 isDrawing = false;
