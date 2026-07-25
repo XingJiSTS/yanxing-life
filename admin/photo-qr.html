@@ -10,11 +10,8 @@
     .upload-box { border: 2px dashed #999; padding: 60px 20px; text-align: center; cursor: pointer; }
     .upload-box:hover { border-color: #007bff; }
     #file-input { display: none; }
-        <div id="preview-box" style="margin:20px auto;max-width:400px;display:none;">
-      <h3>上传图片预览</h3>
-      <img id="img-preview" style="width:100%;border-radius:8px;border:2px solid #342a2a;">
-    </div>
-    <div id="qrcode"></div>
+    #preview-box { margin:20px auto;max-width:400px;display:none; }
+    #img-preview { width:100%;border-radius:8px;border:2px solid #342a2a; }
     #qrcode { margin: 30px auto; text-align: center; }
     .key-modal {
       position: fixed; inset: 0; background: rgba(0,0,0,0.6);
@@ -41,6 +38,11 @@
     <div class="upload-box" onclick="document.getElementById('file-input').click()">
       <p>点击选择图片 / 拖拽图片到此</p>
       <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp">
+    </div>
+    <!-- 预览框放到mainContent内部，正确位置 -->
+    <div id="preview-box">
+      <h3>上传图片预览</h3>
+      <img id="img-preview">
     </div>
     <div id="qrcode"></div>
   </div>
@@ -76,10 +78,10 @@
 
     // 选择文件后上传
     fileInput.addEventListener("change", async (e) => {
-      
       const file = e.target.files[0];
       if (!file) return;
 
+      // 本地图片预览逻辑
       const previewBox = document.getElementById("preview-box");
       const imgPreview = document.getElementById("img-preview");
       const reader = new FileReader();
