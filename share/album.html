@@ -1,40 +1,114 @@
- async function loadAlbumImages(){
-   const params = new URLSearchParams(location.search);
-   const albumId = params.get("albumId");
-   // 增加友好提示，不再纯黑底白字
-   if(!albumId){
-     document.body.style.background = "#f7f9fc";
-     document.body.innerHTML = `
-       <div style="color:#342a2a;margin:auto;text-align:center;padding:40px 20px;font-size:20px;">
-         该页面仅能通过相册二维码/图库相册图片打开<br><br>
-         <a href="/" style="color:#007bff;">返回主页</a>
-       </div>`;
-     return;
-   }
-   try {
-     const res = await fetch(`${WORKER_URL}list`);
-     const data = await res.json();
-     const allFiles = data.files || [];
-     imgList = allFiles.filter(file => file.albumId === albumId).sort((a,b)=>a.time - b.time);
-     if(imgList.length === 0){
-       document.body.style.background = "#f7f9fc";
-       document.body.innerHTML = `
-         <div style="color:#342a2a;margin:auto;text-align:center;padding:40px 20px;font-size:20px;">
-           当前相册无图片<br><br>
-           <a href="/" style="color:#007bff;">返回主页</a>
-         </div>`;
-       return;
-     }
-     renderImages();
-     bindTouch();
-     updatePage();
-   } catch(err){
-     document.body.style.background = "#f7f9fc";
-     document.body.innerHTML = `
-       <div style="color:#342a2a;margin:auto;text-align:center;padding:40px 20px;font-size:20px;">
-         相册加载失败，请刷新页面<br><br>
-         <a href="/" style="color:#007bff;">返回主页</a>
-       </div>`;
-     console.error(err);
-   }
- }
+// 权限拦截
+function checkAuth(){
+    const authFlag = localStorage.getItem("photoSystemAuth");
+    if(authFlag !== "pass"){
+        location.href = "/auth/login";
+    }
+}
+checkAuth();
+
+const WORKER_URL = "https://photo.yanxing.life/";
+const BUCKET_DOMAIN = "https://passer-by-image.yanxing.life";
+const swiperWrap = document.getElementById("swiperWrap");
+const pageNum = document.getElementById("pageNum");
+
+let imgList = [];
+let currentIndex = 0;
+
+// 获取当前相册所有图片（增加3秒超时中断）
+async function loadAlbumImages(){
+  const params = new URLSearchParams(location.search);
+  const albumId = params.get("albumId");
+  // 无相册ID，修正页面底色
+  if(!albumId){
+    document.body.style.background = "#f7f9fc";
+    document.body.innerHTML = `
+    <div style="color:#342a2a;margin:auto;text-align:center;padding:40px 20px;font-size:20px;">
+      该页面仅能通过相册二维码/图库相册图片打开<br><br>
+      <a href="/" style="color:#007bff;text-decoration:none;">返回主页</a>
+    </div>`;
+    return;
+  }
+  try {
+    // 3秒超时，防止无限加载卡死
+    const abortCtrl = new AbortController();
+    setTimeout(() => abortCtrl.abort(), 3000);
+
+    const res = await fetch(`${WORKER_URL}list`, {
+      signal: abortCtrl,
+      headers: {
+        "Accept": "application/json"
+      }
+    });
+
+    if (!res.ok) throw new Error("接口请求异常");
+    const data = await res.json();
+    const allFiles = data.files || [];
+    // 筛选当前相册图片
+    imgList = allFiles.filter(file => file.albumId === albumId).sort((a,b)=>a.time - b.time);
+    
+    if(imgList.length === 0){
+      document.body.style.background = "#f7f9fc";
+      document.body.innerHTML = `
+      <div style="color:#342a2a;margin:auto;text-align:center;padding:40px 20px;font-size:20px;">
+        当前相册无图片<br><br>
+        <a href="/" style="color:#007bff;text-decoration:none;">返回主页</a>
+      </div>`;
+      return;
+    }
+    renderImages();
+    bindTouch();
+    updatePage();
+  } catch(err){
+    document.body.style.background = "#f7f9fc";
+    let tipText = "相册加载失败，请刷新页面";
+    // 区分超时/网络错误
+    if(err.name === "AbortError") tipText = "加载超时，网络不佳请重试";
+    document.body.innerHTML = `
+    <div style="color:#342a2a;margin:auto;text-align:center;padding:40px 20px;font-size:20px;">
+      ${tipText}<br><br>
+      <a href="/" style="color:#007bff;text-decoration:none;">返回主页</a>
+    </div>`;
+    console.error("相册加载错误：", err);
+  }
+}
+
+// 渲染图片轮播
+function renderImages(){
+  swiperWrap.innerHTML = "";
+  imgList.forEach((item,idx)=>{
+    const div = document.createElement("div");
+    div.className = `img-item ${idx === 0 ? 'active' : ''}`;
+    div.innerHTML = `<img src="${BUCKET_DOMAIN}/${item.name}" loading="lazy">`;
+    swiperWrap.appendChild(div);
+  })
+}
+
+// 更新页码
+function updatePage(){
+  pageNum.innerText = `${currentIndex + 1} / ${imgList.length}`;
+  document.querySelectorAll(".img-item").forEach((el,idx)=>{
+    el.classList.toggle("active", idx === currentIndex);
+  })
+}
+
+// 左右滑动切换
+function bindTouch(){
+  let startX = 0;
+  swiperWrap.addEventListener("touchstart", e=>{
+    startX = e.touches[0].clientX;
+  })
+  swiperWrap.addEventListener("touchend", e=>{
+    const endX = e.changedTouches[0].clientX;
+    const diff = startX - endX;
+    if(diff > 60 && currentIndex < imgList.length -1){
+      currentIndex++;
+      updatePage();
+    }else if(diff < -60 && currentIndex > 0){
+      currentIndex--;
+      updatePage();
+    }
+  })
+}
+
+loadAlbumImages();
