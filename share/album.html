@@ -1,3 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>相册照片</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      background: #111;
+    }
+    .swiper-wrap {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+    .img-item {
+      width: 100%;
+      height: 100vh;
+      display: none;
+    }
+    .img-item.active {
+      display: block;
+    }
+    .img-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .page-num {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #fff;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="swiper-wrap" id="swiperWrap"></div>
+  <div class="page-num" id="pageNum"></div>
+
+<!-- 重点：所有JS必须放在script标签内 -->
+<script>
 const WORKER_URL = "https://photo.yanxing.life/";
 const BUCKET_DOMAIN = "https://passer-by-image.yanxing.life";
 const swiperWrap = document.getElementById("swiperWrap");
@@ -97,3 +145,6 @@ function bindTouch(){
 }
 
 loadAlbumImages();
+</script>
+</body>
+</html>
