@@ -63,16 +63,13 @@
       }
       reader.readAsDataURL(fileList[0]);
 
-      // 单张/多张区分
-      const isAlbum = fileList.length > 1;
-      let albumId = "";
-      if(fileList.length > 1){
-      albumId = Date.now() + "_" + Math.random().toString(36).slice(2);
-      }
-      if(isAlbum){
-        // 生成相册唯一ID
-        albumId = Date.now() + "_" + Math.random().toString(36).slice(2);
-      }
+      // 判断是否为多图相册
+    const isAlbum = fileList.length > 1;
+    let albumId = "";
+    // 仅多张图片时生成唯一相册ID
+    if (isAlbum) {
+    albumId = Date.now() + "_" + Math.random().toString(36).slice(2);
+    }
 
       // 限制单张最大50MB
       for(const file of fileList){
