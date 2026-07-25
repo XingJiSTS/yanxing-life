@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>分享照片</title>
+  <style>
+    body { margin: 0; background: #111; display: flex; min-height: 100vh; }
+    img { max-width: 100%; margin: auto; display: block; }
+  </style>
+</head>
+<body>
+  <script>
+    // 读取URL参数 ?id=xxx.png
+    const params = new URLSearchParams(location.search);
+    const imgId = params.get("id");
+    if (!imgId) {
+      document.body.innerHTML = '<div style="color:#fff;margin:auto;">图片链接无效</div>';
+    } else {
+      const imgUrl = `https://passer-by-image.yanxing.life/${imgId}`;
+      document.body.innerHTML = `<img src="${imgUrl}" alt="分享照片">`;
+    }
+  </script>
+</body>
+</html>
