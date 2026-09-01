@@ -41,7 +41,7 @@
       margin:0 auto;
     }
     .img-card {
-      /* 完全移除边框、圆角画框 */
+      position: relative;
       overflow:hidden;
       background:#fff;
     }
@@ -50,6 +50,18 @@
       height:140px;
       object-fit:cover;
       display:block;
+    }
+    .del-btn{
+      position:absolute;
+      top:4px;
+      right:4px;
+      background:#e53935;
+      color:#fff;
+      border:none;
+      border-radius:4px;
+      padding:2px 6px;
+      font-size:12px;
+      z-index:10;
     }
     .empty-tip {
       text-align:center;
@@ -64,7 +76,6 @@
   <a href="/" class="back-btn">返回主页</a>
   <div class="gallery-wrap" id="gallery"></div>
   <div class="empty-tip" id="emptyTip">暂无上传图片</div>
-
   <script>
     // 权限拦截
     function checkAuth(){
@@ -76,27 +87,65 @@
     checkAuth();
 
     const BUCKET_DOMAIN = "https://passer-by-image.yanxing.life";
-    const WORKER_URL = "https://photo.yanxing.life/";
+    // 使用workers.dev原生域名，规避自定义域名跨域
+    const WORKER_URL = "https://photo-upload-worker.abcd20100234.workers.dev/";
     const galleryWrap = document.getElementById("gallery");
     const emptyTip = document.getElementById("emptyTip");
 
+    /**
+     * 删除图片函数，点击按钮调用
+     * @param {string} fileName R2图片文件名
+     */
+    async function deleteImage(fileName){
+      if(!confirm("确定永久删除该图片？删除不可恢复，分享链接会404！")) return;
+      try {
+        const res = await fetch(`${WORKER_URL}${fileName}`, {
+          method:"DELETE",
+          headers:{
+            "X-Upload-Key":"040403"
+          }
+        });
+        const ret = await res.json();
+        console.log("删除返回", ret);
+        if(res.ok){
+          alert("删除成功");
+          await loadAllImages(); // 删除成功重新加载列表
+        }else{
+          alert("删除失败：" + JSON.stringify(ret));
+        }
+      }catch(err){
+        console.error(err);
+        alert("网络请求异常");
+      }
+    }
+
     async function loadAllImages() {
       try {
+        galleryWrap.innerHTML = ""; // 清空旧列表
         const res = await fetch(WORKER_URL + "list");
         const data = await res.json();
         const fileList = data.files || [];
-
-        if(fileList.length === 0) return;
+        if(fileList.length === 0){
+          emptyTip.style.display = "block";
+          return;
+        }
         emptyTip.style.display = "none";
-
         // 全部图片按上传时间倒序，忽略相册分组
         fileList.sort((a,b) => b.time - a.time);
-
         fileList.forEach(fileItem => {
           const card = document.createElement("div");
           card.className = "img-card";
           const imgUrl = `${BUCKET_DOMAIN}/${fileItem.name}`;
-          card.innerHTML = `<img src="${imgUrl}" loading="lazy">`;
+          // 渲染图片 + 删除按钮（管理员可见）
+          card.innerHTML = `
+            <img src="${imgUrl}" loading="lazy">
+            <button class="del-btn">删除</button>
+          `;
+          // 删除按钮事件
+          card.querySelector(".del-btn").onclick = (e)=>{
+            e.stopPropagation(); // 阻止触发卡片跳转
+            deleteImage(fileItem.name);
+          };
           // 单图跳转原图页，相册图跳转相册页
           card.onclick = () => {
             if(fileItem.albumId){
@@ -113,17 +162,6 @@
       }
     }
     loadAllImages();
-
-    const fileName = "1784988117201_bepq2yl1a3u.jpg";
-const res = await fetch(`${WORKER_URL}${fileName}`, {
-  method:"DELETE",
-  headers:{
-    "X-Upload-Key":"040403"
-  }
-});
-const ret = await res.json();
-console.log(ret);
-
   </script>
 </body>
 </html>
