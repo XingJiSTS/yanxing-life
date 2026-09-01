@@ -113,6 +113,17 @@
       }
     }
     loadAllImages();
+
+    const fileName = "1784988117201_bepq2yl1a3u.jpg";
+const res = await fetch(`${WORKER_URL}${fileName}`, {
+  method:"DELETE",
+  headers:{
+    "X-Upload-Key":"040403"
+  }
+});
+const ret = await res.json();
+console.log(ret);
+
   </script>
 </body>
 </html>
