@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>衍星小宇宙</title>
+    <link rel="icon" href="assets/images/favicon.ico" type="image/x-icon">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(160deg, #0b1026 0%, #1b2350 45%, #3a2b5f 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            color: #f2f3ff;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stars {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            border-radius: 50%;
+            background: #ffffff;
+            animation: twinkle 3s infinite ease-in-out;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.15; }
+            50% { opacity: 0.95; }
+        }
+
+        .container {
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            position: relative;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: clamp(24px, 8vw, 56px);
+            margin-bottom: 2vh;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            background: linear-gradient(90deg, #8fb8ff, #ffb3d9, #a6ffcb);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .emoji {
+            font-size: clamp(80px, 30vw, 160px);
+            margin-bottom: 16px;
+            line-height: 1.2;
+            cursor: pointer;
+            transition: transform 0.2s, filter 0.3s;
+            user-select: none;
+            filter: drop-shadow(0 0 24px rgba(143, 184, 255, 0.45));
+        }
+
+        .emoji:hover {
+            transform: scale(1.1);
+        }
+
+        .quote {
+            min-height: 3.2em;
+            font-size: clamp(14px, 4vw, 19px);
+            line-height: 1.7;
+            color: #cfd6ff;
+            margin: 0 auto 18px;
+            max-width: 480px;
+            padding: 0 8px;
+        }
+
+        .btn {
+            font-weight: 500;
+            display: block;
+            border: 3px solid #cfd6ff;
+            color: #eaf0ff;
+            margin: 12px auto;
+            background: rgba(255, 255, 255, 0.06);
+            text-decoration: none;
+            font-size: 24px;
+            padding: 12px 20px;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            width: 85%;
+            max-width: 400px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.16);
+        }
+
+        @media (min-width: 768px) {
+            .btn {
+                font-size: 32px;
+                width: 60%;
+                border-width: 5px;
+            }
+            .emoji { margin-bottom: 26px; }
+        }
+
+        @media (min-width: 1024px) {
+            .btn { font-size: 36px; width: 50%; }
+        }
+
+        .emoji-trail {
+            position: absolute;
+            font-size: 30px;
+            pointer-events: none;
+            z-index: 5;
+            animation: trail-fade 0.6s ease-out forwards;
+        }
+
+        @keyframes trail-fade {
+            0% { opacity: 1; transform: translate(0, 0) scale(0.7); }
+            100% { opacity: 0; transform: translate(0, -40px) rotate(30deg) scale(0.2); }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="stars" id="stars"></div>
+
+    <div class="container">
+        <h1>衍星小宇宙</h1>
+        <p class="emoji" id="emoji">✨</p>
+        <p class="quote" id="quote">轻轻点击星星，听它说一句话。</p>
+
+        <button class="btn" id="talkBtn">让星星说句话</button>
+        <button class="btn" id="moodBtn">换个心情</button>
+        <a href="index.html" class="btn">返回主页</a>
+    </div>
+
+    <script>
+        const EMOJIS = ["✨", "🌟", "🌙", "🪐", "🚀", "🛸", "🌌", "☄️", "🔭", "💫"];
+        const QUOTES = [
+            "每一颗星，都在替某人守夜。",
+            "你抬头的那一刻，宇宙刚好也在看你。",
+            "慢一点没关系，星星也是走了很久才亮的。",
+            "把今天的心事，交给这片星海吧。",
+            "衍星而行，不问归期。",
+            "所有的迷路，都是为了遇见更好的风景。",
+            "你已经比昨天更亮了一点。"
+        ];
+
+        const emojiEl = document.getElementById("emoji");
+        const quoteEl = document.getElementById("quote");
+        const starsBox = document.getElementById("stars");
+
+        // 生成背景星空
+        for (let i = 0; i < 90; i++) {
+            const s = document.createElement("span");
+            s.className = "star";
+            s.style.left = Math.random() * 100 + "%";
+            s.style.top = Math.random() * 100 + "%";
+            s.style.animationDelay = (Math.random() * 3).toFixed(2) + "s";
+            s.style.opacity = (0.2 + Math.random() * 0.8).toFixed(2);
+            starsBox.appendChild(s);
+        }
+
+        function randomOf(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        document.getElementById("talkBtn").addEventListener("click", () => {
+            quoteEl.textContent = randomOf(QUOTES);
+        });
+
+        document.getElementById("moodBtn").addEventListener("click", () => {
+            emojiEl.textContent = randomOf(EMOJIS);
+            emojiEl.style.transform = "scale(1.2)";
+            setTimeout(() => { emojiEl.style.transform = "scale(1)"; }, 220);
+        });
+
+        // 保留主页的 emoji 拖拽轨迹玩法
+        let isDrawing = false;
+
+        emojiEl.addEventListener("click", (e) => {
+            e.stopPropagation();
+            isDrawing = !isDrawing;
+            emojiEl.style.filter = isDrawing
+                ? "drop-shadow(0 0 28px rgba(255, 179, 217, 0.75))"
+                : "drop-shadow(0 0 24px rgba(143, 184, 255, 0.45))";
+        });
+
+        function createTrail(x, y) {
+            if (!isDrawing) return;
+            const trail = document.createElement("span");
+            trail.className = "emoji-trail";
+            trail.textContent = emojiEl.textContent.trim();
+            trail.style.left = (x - 15) + "px";
+            trail.style.top = (y - 15) + "px";
+            document.body.appendChild(trail);
+            setTimeout(() => trail.remove(), 600);
+        }
+
+        window.addEventListener("mousemove", (e) => createTrail(e.clientX, e.clientY));
+        window.addEventListener("touchmove", (e) => {
+            const touch = e.touches[0];
+            createTrail(touch.clientX, touch.clientY);
+        }, { passive: true });
+
+        window.addEventListener("click", (e) => {
+            if (e.target !== emojiEl && isDrawing) {
+                isDrawing = false;
+                emojiEl.style.filter = "drop-shadow(0 0 24px rgba(143, 184, 255, 0.45))";
+            }
+        });
+    </script>
+</body>
+</html>
