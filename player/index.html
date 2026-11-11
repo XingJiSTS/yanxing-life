@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>字幕播放器 · 衍星Life</title>
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#000000;
+    --panel:#000000;
+    --panel2:#000000;
+    --line:rgba(252,252,250,.30);
+    --line-strong:rgba(252,252,250,.78);
+    --fg:#FCFCFA;
+    --dim:rgba(252,252,250,.62);
+    --dim2:rgba(252,252,250,.36);
+    --acc:#FCFCFA;
+    --acc-soft:rgba(252,252,250,.10);
+    --sys:#FCFCFA;
+    --warn:#FCFCFA;
+    --err:#FCFCFA;
+    --big:34px;
+    --font:"Helvetica Neue",Helvetica,Arial,"Noto Sans SC","Source Han Sans SC","PingFang SC","Microsoft YaHei","SimHei",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--fg); overflow:hidden;
+    font:14px/1.6 var(--font);
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    display:flex; flex-direction:column;
+  }
+  button,input,select,textarea{font-family:var(--font)}
+  button{
+    font:inherit; color:var(--fg); background:transparent; border:1px solid var(--line);
+    border-radius:0; padding:5px 10px; cursor:pointer; letter-spacing:.02em;
+    transition:background .12s,color .12s,border-color .12s;
+  }
+  button:hover{background:var(--fg); color:#000; border-color:var(--fg)}
+  button:active{background:var(--fg); color:#000; border-color:var(--fg)}
+  button.on{background:var(--fg); color:#000; border-color:var(--fg)}
+  .mono{font-variant-numeric:tabular-nums; letter-spacing:.02em}
+
+  /* ---------- 顶栏 ---------- */
+  header{
+    flex:none; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:10px 18px; background:#000;
+    border-bottom:1px solid var(--line); position:relative; z-index:6;
+  }
+  .backlink{flex:none; display:inline-flex; align-items:center; padding:4px 9px;
+    border:1px solid var(--line); border-radius:0; color:var(--dim); font-size:11.5px;
+    letter-spacing:.06em; text-decoration:none; transition:background .12s,color .12s,border-color .12s}
+  .backlink:hover{background:var(--fg); color:#000; border-color:var(--fg)}
+  .brand{display:flex; align-items:center; gap:10px; margin-right:6px}
+  .brand .dot{width:8px;height:8px;border-radius:0;background:var(--fg);box-shadow:none;animation:none}
+  .brand b{font-size:13px;font-weight:700;letter-spacing:.14em}
+  .brand span{font-size:9.5px;color:var(--dim2);letter-spacing:.24em;text-transform:uppercase}
+  label.file{
+    display:inline-flex; align-items:center; gap:6px;
+    background:transparent; border:1px solid var(--line); border-radius:0;
+    padding:5px 11px; cursor:pointer; font-size:12.5px; color:var(--fg); white-space:nowrap;
+    transition:background .12s,color .12s,border-color .12s;
+  }
+  label.file:hover{background:var(--fg); color:#000; border-color:var(--fg)}
+  label.file input{display:none}
+  label.file svg{width:12px;height:12px;fill:currentColor;opacity:.8}
+  #meta{margin-left:auto; color:var(--dim); font-size:11px; white-space:nowrap; max-width:38vw;
+        overflow:hidden; text-overflow:ellipsis; letter-spacing:.04em}
+  .seg{display:flex; border:1px solid var(--line); border-radius:0; overflow:hidden; flex:none}
+  .seg button{border:0; border-radius:0; background:transparent; padding:5px 11px; font-size:12.5px; color:var(--dim)}
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button:hover{background:rgba(252,252,250,.14); color:var(--fg)}
+  .seg button.on{background:var(--fg); color:#000}
+
+  /* ---------- 主体 ---------- */
+  main{flex:1; display:flex; min-height:0}
+  .stagewrap{
+    position:relative; flex:1; min-width:0; overflow:hidden;
+    background:#000;
+  }
+  #stage{position:absolute; inset:0; cursor:pointer; user-select:none; -webkit-user-select:none}
+  #stage::after{
+    content:""; position:absolute; z-index:7; left:0; right:0; bottom:0; height:200px;
+    background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.62) 46%, #000 100%);
+    pointer-events:none;
+  }
+
+  .stageTop{
+    position:absolute; z-index:8; top:16px; left:18px; right:18px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    pointer-events:none;
+  }
+  .stageTop .group{display:flex; align-items:center; gap:8px; pointer-events:auto}
+  .pill{
+    font-size:10.5px; color:var(--dim); background:rgba(0,0,0,.78);
+    border:1px solid var(--line); border-radius:0; padding:3px 10px; backdrop-filter:blur(4px);
+    letter-spacing:.10em; text-transform:uppercase;
+    max-width:34vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .ghostBtn{background:rgba(0,0,0,.78); backdrop-filter:blur(4px); font-size:12px; color:var(--dim)}
+  .ghostBtn:hover{background:var(--fg); color:#000}
+  .ghostBtn.on{background:var(--fg); color:#000; border-color:var(--fg)}
+
+  /* 歌词模式 */
+  #lyricView{
+    position:absolute; inset:0; overflow:hidden;
+    -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 72%,transparent 92%);
+            mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 72%,transparent 92%);
+  }
+  #lyricInner{position:absolute; left:0; right:0; top:0; padding:45vh 9vw; will-change:transform;
+              transition:transform .55s cubic-bezier(.22,1,.36,1)}
+  .lyr{
+    padding:10px 0; text-align:center; color:rgba(252,252,250,.32); white-space:pre-wrap; word-break:break-word;
+    font-size:24px; line-height:1.5; opacity:1; text-wrap:balance; letter-spacing:.02em;
+    transition:color .32s,font-size .32s,letter-spacing .32s;
+  }
+  .lyr .d{display:block; font-size:.52em; color:rgba(252,252,250,.30); letter-spacing:.18em; margin-bottom:.24em}
+  .lyr.cur{color:var(--fg); font-size:34px; letter-spacing:.06em; text-shadow:none}
+  .lyr.cur .d{color:rgba(252,252,250,.55)}
+  .lyr.cur .sys{letter-spacing:.10em; font-weight:600}
+  .lyr.sys{color:rgba(252,252,250,.30)}
+  .lyr.cur.ghost{font-size:30px; opacity:.42; transition:opacity 3.2s linear,color .32s,font-size .32s}
+  .lyr.hidden{display:none}
+
+  /* 大字幕模式 */
+  #bigView{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    padding:0 8vw; pointer-events:none;
+  }
+  #bigText{
+    max-width:min(1080px,92%); text-align:center; white-space:pre-wrap; word-break:break-word;
+    font-size:var(--big); line-height:1.55; letter-spacing:.03em; opacity:1; transform:translateY(0);
+    transition:opacity .12s linear,transform .3s ease;
+  }
+  #bigText .bigDir{display:block; font-size:.52em; color:rgba(252,252,250,.50); letter-spacing:.18em; margin-bottom:.32em; line-height:1.5}
+  #bigText .sys{letter-spacing:.08em; font-weight:600}
+  #bigText .emptyHint{color:rgba(252,252,250,.32); font-size:.70em; letter-spacing:.20em}
+
+  /* 中央播放按钮 */
+  #playBig{
+    position:absolute; z-index:9; left:50%; bottom:24px; width:64px; height:64px; margin:0 0 0 -32px;
+    border-radius:0; border:1px solid var(--line-strong);
+    background:rgba(0,0,0,.74); backdrop-filter:blur(8px);
+    display:flex; align-items:center; justify-content:center; padding:0;
+    box-shadow:none; opacity:.92; transition:opacity .26s,background .16s,color .16s,border-color .16s;
+  }
+  #playBig:hover{background:var(--fg); color:#000; border-color:var(--fg); transform:none}
+  #playBig svg{width:24px;height:24px;fill:currentColor}
+  #playBig .ico-pause{display:none}
+  body.playing #playBig .ico-play{display:none}
+  body.playing #playBig .ico-pause{display:block}
+  body.playing #playBig{opacity:.16}
+  body.playing #stage:hover #playBig{opacity:.9}
+  #playBig.disabled{opacity:.35; cursor:not-allowed}
+  .stageHint{
+    position:absolute; z-index:8; left:50%; bottom:104px; transform:translateX(-50%);
+    color:rgba(252,252,250,.38); font-size:10.5px; letter-spacing:.16em; pointer-events:none; white-space:nowrap;
+    opacity:1; transition:opacity .3s;
+  }
+  body.playing .stageHint{opacity:0}
+  body.hasMedia .stageHint{display:none}
+
+  /* 右侧栏 */
+  aside#side{
+    width:clamp(330px,30vw,430px); flex:none; display:flex; flex-direction:column;
+    background:#000; border-left:1px solid var(--line); min-height:0;
+  }
+  aside#side.hide{display:none}
+  .listPanel{flex:1; min-height:0; display:flex; flex-direction:column}
+  .listHead{flex:none; display:flex; gap:6px; padding:8px 10px; border-bottom:1px solid var(--line); align-items:center}
+  #search{
+    flex:1; min-width:0; background:#000; color:var(--fg); border:1px solid var(--line);
+    border-radius:0; padding:5px 9px; font-size:12.5px; outline:none; letter-spacing:.02em;
+  }
+  #search::placeholder{color:var(--dim2)}
+  #search:focus{border-color:var(--fg)}
+  .count{font-size:10.5px; color:var(--dim2); white-space:nowrap; font-variant-numeric:tabular-nums; letter-spacing:.06em}
+  #list{flex:1; overflow-y:auto; overflow-x:hidden; padding:2px 0 16px; scroll-behavior:smooth}
+  #list::-webkit-scrollbar,#term::-webkit-scrollbar{width:8px}
+  #list::-webkit-scrollbar-thumb,#term::-webkit-scrollbar-thumb{background:rgba(252,252,250,.26); border-radius:0}
+  #list::-webkit-scrollbar-track,#term::-webkit-scrollbar-track{background:transparent}
+  .cue{
+    display:flex; gap:10px; align-items:baseline; padding:7px 12px 7px 10px; cursor:pointer;
+    border-left:1px solid transparent; transition:background .12s,border-color .12s;
+  }
+  .cue:hover{background:rgba(252,252,250,.07)}
+  .cue.active{background:rgba(252,252,250,.11); border-left-color:var(--fg)}
+  .cue.sel{background:rgba(252,252,250,.17); border-left-color:var(--fg)}
+  .cue.sel.active{background:rgba(252,252,250,.21); border-left-color:var(--fg)}
+  .cue .t{flex:none; width:58px; color:rgba(252,252,250,.38); font-size:10.5px; font-variant-numeric:tabular-nums; letter-spacing:.04em}
+  .cue.active .t{color:var(--fg)}
+  .cue .x{flex:1; min-width:0; font-size:12.6px; line-height:1.55; word-break:break-word}
+  .cue .x .d{color:rgba(252,252,250,.44); font-size:.94em; letter-spacing:.10em}
+  .cue .x .sys{letter-spacing:.06em; font-weight:600}
+  .cue.hide{display:none}
+  .cue.hit{background:rgba(252,252,250,.13); outline:1px solid rgba(252,252,250,.42); outline-offset:-1px}
+
+  /* 终端 */
+  .termPanel{
+    flex:none; height:37%; min-height:190px; max-height:46%; display:flex; flex-direction:column;
+    border-top:1px solid var(--line); background:#000;
+  }
+  .termHead{
+    flex:none; display:flex; align-items:center; gap:9px; padding:6px 10px;
+    background:#000; border-bottom:1px solid var(--line);
+  }
+  .dots{display:flex; gap:5px}
+  .dots i{width:7px;height:7px;border-radius:0;display:block;background:transparent;border:1px solid var(--line)}
+  .termTitle{font-size:10px; letter-spacing:.22em; color:rgba(252,252,250,.46); text-transform:uppercase}
+  .termHead button{margin-left:auto; background:transparent; border:1px solid var(--line); border-radius:0; color:var(--dim); font-size:10.5px; padding:2px 8px; letter-spacing:.06em}
+  .termHead button:hover{background:var(--fg); border-color:var(--fg); color:#000}
+  #term{
+    flex:1; overflow-y:auto; padding:10px 12px 14px; font-family:var(--font);
+    font-size:11.5px; line-height:1.8; color:var(--fg); position:relative; background:#000;
+    font-variant-numeric:tabular-nums;
+  }
+  .tline{display:flex; gap:8px; word-break:break-word; animation:lineIn .22s ease-out}
+  @keyframes lineIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .tline .ts{flex:none; color:rgba(252,252,250,.34); font-size:10.5px; padding-top:1px}
+  .tline .msg{flex:1; min-width:0; color:rgba(252,252,250,.86)}
+  .tline.warn .msg{color:var(--fg); font-weight:600}
+  .tline.err .msg{color:var(--fg); font-weight:700; text-decoration:underline; text-underline-offset:2px}
+  .tline.info .msg{color:rgba(252,252,250,.42)}
+  .cursor{display:inline-block; width:7px; height:13px; background:var(--fg); opacity:.85;
+           animation:blink 1.1s steps(1) infinite; vertical-align:-2px; margin-left:2px}
+  @keyframes blink{50%{opacity:0}}
+
+  /* ---------- 底部 ---------- */
+  footer{
+    flex:none; background:#000; border-top:1px solid var(--line);
+    padding:8px 18px 10px; position:relative; z-index:7;
+  }
+  #seekWrap{position:relative; height:30px; cursor:pointer; touch-action:none}
+  #seekWrap .track{
+    position:absolute; left:0; right:0; top:13px; height:2px; background:rgba(252,252,250,.18);
+    border-radius:0; overflow:hidden;
+  }
+  #buf{position:absolute; left:0; top:0; bottom:0; width:0; background:rgba(252,252,250,.30); border-radius:0}
+  #fill{position:absolute; left:0; top:0; bottom:0; width:0; border-radius:0; background:var(--fg)}
+  #marks{position:absolute; left:0; right:0; top:8px; height:12px; pointer-events:none; opacity:.34}
+  #marks i{position:absolute; top:0; width:1px; height:12px; background:rgba(252,252,250,.75)}
+  #head{
+    position:absolute; top:4px; width:2px; height:20px; margin-left:-1px; border-radius:0;
+    background:var(--fg); box-shadow:none; pointer-events:none;
+    transition:transform .1s;
+  }
+  #seekWrap:hover #head,#seekWrap.dragging #head{transform:scaleY(1.15)}
+  #seekTip{
+    position:absolute; bottom:28px; left:0; transform:translateX(-50%) translateY(4px);
+    background:#000; border:1px solid var(--line-strong); border-radius:0;
+    padding:8px 11px; min-width:110px; max-width:300px; pointer-events:none;
+    opacity:0; transition:opacity .14s,transform .14s; box-shadow:none;
+  }
+  #seekTip.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  #seekTip b{display:block; font-size:11.5px; color:var(--fg); font-variant-numeric:tabular-nums; letter-spacing:.08em; margin-bottom:3px}
+  #seekTip span{display:block; font-size:12px; color:var(--dim); line-height:1.5; word-break:break-word;
+                max-height:3.1em; overflow:hidden}
+  .ctrlRow{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:2px}
+  .time{font-variant-numeric:tabular-nums; font-size:11.5px; color:var(--dim); white-space:nowrap; letter-spacing:.04em}
+  .time b{color:var(--fg); font-weight:600}
+  .group{display:flex; align-items:center; gap:4px}
+  .group>span{color:var(--dim2); font-size:10.5px; letter-spacing:.10em}
+  .ctrlRow button{padding:4px 9px; font-size:11.5px}
+  #offset{color:var(--fg); font-weight:600; min-width:4.4em; text-align:center; font-variant-numeric:tabular-nums}
+  .shortcut{margin-left:auto; color:rgba(252,252,250,.28); font-size:10.5px; white-space:nowrap; letter-spacing:.04em}
+
+  /* 跳转浮条 */
+  #jumpToast{
+    position:fixed; left:50%; bottom:100px; transform:translateX(-50%) translateY(12px);
+    display:flex; align-items:center; gap:10px; max-width:min(760px,88vw);
+    background:#000; border:1px solid var(--line-strong); border-radius:0;
+    padding:8px 10px 8px 14px; box-shadow:none;
+    opacity:0; pointer-events:none; transition:opacity .18s,transform .18s; z-index:40;
+    backdrop-filter:blur(8px);
+  }
+  #jumpToast.show{opacity:1; pointer-events:auto; transform:translateX(-50%) translateY(0)}
+  #jumpLabel{font-size:12px; color:var(--dim); max-width:38vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  #jumpBtn{
+    background:var(--fg); border:1px solid var(--fg); border-radius:0; color:#000;
+    font-size:12.5px; padding:6px 13px; white-space:nowrap; box-shadow:none; letter-spacing:.04em;
+  }
+  #jumpBtn:hover{background:transparent; color:var(--fg)}
+  #jumpClose{background:transparent; border:1px solid var(--line); border-radius:0; color:var(--dim); font-size:15px; padding:2px 8px; line-height:1.2}
+  #jumpClose:hover{background:var(--fg); border-color:var(--fg); color:#000}
+
+  /* 拖放 */
+  #drop{
+    position:fixed; inset:0; z-index:60; display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.92); border:1px dashed var(--line-strong); font-size:18px; color:var(--fg);
+    letter-spacing:.20em; backdrop-filter:blur(2px);
+  }
+  #drop.show{display:flex}
+
+  @media (max-width:900px){
+    aside#side{width:300px}
+    .shortcut{display:none}
+    #bigText{font-size:26px}
+  }
+</style>
+</head>
+<body data-default-subs="subs/track3.safe.lrc">
+
+<header>
+  <a class="backlink" href="../">← 返回主页</a>
+  <div class="brand">
+    <span class="dot"></span>
+    <div>
+      <b>字幕预览播放器</b><br>
+      <span>SUBTITLE PREVIEW</span>
+    </div>
+  </div>
+  <label class="file">
+    <svg viewBox="0 0 24 24"><path d="M12 3v10.6l3.3-3.3 1.4 1.4L12 16.4l-4.7-4.7 1.4-1.4L12 13.6V3h0zM5 19h14v2H5z"/></svg>
+    载入音频<input id="audioFile" type="file" accept="audio/*,video/*">
+  </label>
+  <label class="file">
+    <svg viewBox="0 0 24 24"><path d="M4 4h16v2H4zm0 7h16v2H4zm0 7h10v2H4z"/></svg>
+    载入字幕<input id="subFile" type="file" accept=".srt,.lrc,.vtt,text/plain">
+  </label>
+  <div class="seg" id="modeSeg">
+    <button data-mode="lyric" class="on">竖向歌词</button>
+    <button data-mode="big">大字幕</button>
+  </div>
+  <button id="btnSide" class="on" title="显示/隐藏字幕列表">列表</button>
+  <span id="meta">拖入音频与字幕即可预览</span>
+</header>
+
+<main>
+  <section class="stagewrap">
+    <div id="stage">
+      <div id="lyricView"><div id="lyricInner"></div></div>
+      <div id="bigView">
+        <div id="bigText"><span class="emptyHint">载入音频与字幕开始预览</span></div>
+      </div>
+      <div class="stageTop">
+        <div class="group"><span class="pill" id="nowTag">未载入</span></div>
+        <div class="group">
+          <button class="ghostBtn" id="btnBackCur" style="display:none">回到当前句</button>
+          <button class="ghostBtn" id="btnFull">全屏</button>
+        </div>
+      </div>
+      <button id="playBig" title="播放 / 暂停（空格）">
+        <svg class="ico-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+        <svg class="ico-pause" viewBox="0 0 24 24"><path d="M6.5 5h4v14h-4zm7 0h4v14h-4z"/></svg>
+      </button>
+      <div class="stageHint">点击画面或空格键播放 / 暂停</div>
+    </div>
+  </section>
+
+  <aside id="side">
+    <div class="listPanel">
+      <div class="listHead">
+        <input id="search" placeholder="搜索字幕…">
+        <span class="count" id="count">0 条</span>
+        <button id="btnFollow" class="on" title="自动滚动到当前句">跟随</button>
+      </div>
+      <div id="list"></div>
+    </div>
+    <div class="termPanel">
+      <div class="termHead">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="termTitle">SYSTEM MONITOR</span>
+        <button id="termClear">清空</button>
+      </div>
+      <div id="term"><div class="cursor"></div></div>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <div id="seekWrap">
+    <div class="track"><div id="buf"></div><div id="fill"></div></div>
+    <div id="marks"></div>
+    <div id="head"></div>
+    <div id="seekTip"><b id="tipTime">00:00.00</b><span id="tipText">—</span></div>
+  </div>
+  <div class="ctrlRow">
+    <div class="time"><b id="cur">00:00.00</b> / <span id="dur">00:00.00</span></div>
+    <div class="group">
+      <span>偏移</span>
+      <button data-shift="-1">-1s</button>
+      <button data-shift="-0.1">-0.1</button>
+      <span id="offset">+0.00</span>
+      <button data-shift="0.1">+0.1</button>
+      <button data-shift="1">+1s</button>
+      <button data-shift="0" title="清零">归零</button>
+    </div>
+    <div class="group"><button id="btnPrev">上一句</button><button id="btnNext">下一句</button></div>
+    <div class="group"><span>字号</span><button data-font="-2">A-</button><button data-font="2">A+</button></div>
+    <span class="shortcut">空格 播放/暂停 · ←→ 5秒 · ↑↓ 上/下句 · M 切模式 · F 全屏</span>
+  </div>
+</footer>
+
+<div id="jumpToast">
+  <span id="jumpLabel">已选中</span>
+  <button id="jumpBtn">跳转</button>
+  <button id="jumpClose" title="关闭">×</button>
+</div>
+
+<div id="drop">松开以载入音频 / 字幕</div>
+<audio id="audio" preload="metadata"></audio>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var audio = $('audio');
+
+  var cues = [];
+  var offset = 0;            // 正值 = 字幕延后
+  var mode = 'lyric';        // lyric | big
+  var follow = true;
+  var selected = -1;
+  var active = -1;           // 当前播放命中的字幕
+  var lingerSec = 3.6;       // 上一句在空档期的渐隐时长
+  var rafId = null;
+  var dragging = false;
+  var dragTime = 0;
+  var loggedSystem = Object.create(null);
+  var lastBigIdx = -1;
+  var lastLyricIdx = -1;
+  var lastLyricGhost = false;
+
+  // ---------- 时间格式 ----------
+  function fmt(t) {
+    if (!isFinite(t) || t < 0) t = 0;
+    var m = Math.floor(t / 60), s = t - m * 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s.toFixed(2);
+  }
+  function fmtLong(t) {
+    if (!isFinite(t) || t < 0) t = 0;
+    var h = Math.floor(t / 3600), m = Math.floor((t - h * 3600) / 60), s = t - h * 3600 - m * 60;
+    return (h ? h + ':' : '') + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s.toFixed(2);
+  }
+  function parseTime(s) {
+    s = s.trim();
+    var m = s.match(/(?:(\d+):)?(\d+):(\d+)[.,](\d{1,3})/);
+    if (m) {
+      var frac = m[4];
+      while (frac.length < 3) frac += '0';
+      return (+m[1] || 0) * 3600 + (+m[2]) * 60 + (+m[3]) + (+frac) / 1000;
+    }
+    return 0;
+  }
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // ---------- 字幕解析 ----------
+  function splitDirText(raw) {
+    var lines = raw.split('\n');
+    var dirs = [], body = [];
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i];
+      if (!body.length && /^[（(].*[）)]$/.test(l.trim())) dirs.push(l.trim());
+      else body.push(l);
+    }
+    var text = body.join('\n').trim();
+    var sys = text.indexOf('【系统】') === 0;
+    if (sys) text = text.slice(4);
+    return { dirs: dirs, text: text, sys: sys };
+  }
+
+  function parseSRT(txt) {
+    txt = txt.replace(/\r\n?/g, '\n');
+    var out = [], blocks = txt.split(/\n{2,}/);
+    for (var i = 0; i < blocks.length; i++) {
+      var lines = blocks[i].split('\n').filter(function (l) { return l.trim() !== ''; });
+      if (!lines.length) continue;
+      var ti = -1;
+      for (var j = 0; j < lines.length; j++) {
+        if (/-->/.test(lines[j])) { ti = j; break; }
+      }
+      if (ti < 0) continue;
+      var parts = lines[ti].split('-->');
+      var st = parseTime(parts[0]), en = parseTime(parts[1] || '');
+      var p = splitDirText(lines.slice(ti + 1).join('\n'));
+      out.push({ start: st, end: en > st ? en : st + 1.5, dirs: p.dirs, text: p.text, sys: p.sys });
+    }
+    return out;
+  }
+
+  function parseLRC(txt) {
+    txt = txt.replace(/\r\n?/g, '\n');
+    var out = [], lines = txt.split('\n');
+    var tagRe = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i], stamps = [], m;
+      tagRe.lastIndex = 0;
+      while ((m = tagRe.exec(line))) {
+        var frac = m[3] ? parseInt(m[3], 10) : 0;
+        if (m[3] && m[3].length === 2) frac *= 10;
+        if (m[3] && m[3].length === 1) frac *= 100;
+        stamps.push((+m[1]) * 60 + (+m[2]) + frac / 1000);
+      }
+      if (!stamps.length) continue;
+      var body = line.replace(tagRe, '').trim();
+      if (!body) continue;
+      body = body.replace(/\u3000/g, '\n');
+      var p = splitDirText(body);
+      for (var k = 0; k < stamps.length; k++) {
+        out.push({ start: stamps[k], end: 0, dirs: p.dirs, text: p.text, sys: p.sys });
+      }
+    }
+    out.sort(function (a, b) { return a.start - b.start; });
+    for (var n = 0; n < out.length; n++) {
+      var nx = out[n + 1];
+      out[n].end = nx ? Math.min(nx.start, out[n].start + 8) : out[n].start + 4;
+      if (out[n].end <= out[n].start) out[n].end = out[n].start + 0.4;
+    }
+    return out;
+  }
+
+  function parseVTT(txt) {
+    txt = txt.replace(/\r\n?/g, '\n').replace(/^WEBVTT[^\n]*\n/, '');
+    return parseSRT(txt);
+  }
+
+  function parseSubs(name, txt) {
+    var ext = (name.split('.').pop() || '').toLowerCase();
+    if (ext === 'lrc') return parseLRC(txt);
+    if (ext === 'vtt') return parseVTT(txt);
+    if (/\[ti:|\[\d\d:\d\d\.\d\d\]/.test(txt) && !/-->/.test(txt)) return parseLRC(txt);
+    return parseSRT(txt);
+  }
+
+  // ---------- 二分查找 ----------
+  function findCue(t) {
+    var lo = 0, hi = cues.length - 1, best = -1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (cues[mid].start + offset <= t) { best = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    if (best >= 0 && t <= cues[best].end + offset + 0.02) return best;
+    return -1;
+  }
+  function prevIndex(t) {
+    var lo = 0, hi = cues.length - 1, best = -1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (cues[mid].start + offset <= t) { best = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    return best;
+  }
+  function nextIndex(t) {
+    var lo = 0, hi = cues.length - 1, res = -1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (cues[mid].start + offset > t) { res = mid; hi = mid - 1; }
+      else lo = mid + 1;
+    }
+    return res;
+  }
+
+  // ---------- 字幕列表 ----------
+  function renderList() {
+    var list = $('list');
+    list.innerHTML = '';
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < cues.length; i++) {
+      var c = cues[i];
+      var d = document.createElement('div');
+      d.className = 'cue';
+      d.dataset.i = i;
+      d.dataset.text = ((c.dirs.join(' ')) + ' ' + (c.sys ? '【系统】' : '') + c.text).toLowerCase();
+      var t = document.createElement('span');
+      t.className = 't';
+      t.textContent = fmt(c.start + offset);
+      var x = document.createElement('span');
+      x.className = 'x';
+      var html = '';
+      if (c.dirs.length) html += '<span class="d">' + esc(c.dirs.join(' ')) + '</span> ';
+      html += c.sys ? '<span class="sys">【系统】' + esc(c.text.replace(/\n/g, ' ')) + '</span>' : esc(c.text);
+      x.innerHTML = html;
+      d.appendChild(t); d.appendChild(x);
+      frag.appendChild(d);
+    }
+    list.appendChild(frag);
+    $('count').textContent = cues.length + ' 条';
+    renderMarks();
+    selected = -1;
+    active = -1;
+    hideJump();
+  }
+
+  function renderMarks() {
+    var dur = audio.duration || 0;
+    var box = $('marks');
+    box.innerHTML = '';
+    if (!dur) return;
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < cues.length; i++) {
+      var el = document.createElement('i');
+      el.style.left = Math.min(100, Math.max(0, (cues[i].start + offset) / dur * 100)) + '%';
+      frag.appendChild(el);
+    }
+    box.appendChild(frag);
+  }
+
+  function markActive(i, scroll) {
+    if (i === active) return;
+    var list = $('list');
+    var prev = list.querySelector('.cue.active');
+    if (prev) prev.classList.remove('active');
+    active = i;
+    if (i < 0) return;
+    var el = list.querySelector('.cue[data-i="' + i + '"]');
+    if (!el) return;
+    el.classList.add('active');
+    if (follow && scroll !== false) {
+      var top = el.offsetTop - list.clientHeight * 0.42;
+      list.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    }
+  }
+
+  // ---------- 舞台渲染 ----------
+  function buildLyric() {
+    var box = $('lyricInner');
+    box.innerHTML = '';
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < cues.length; i++) {
+      var c = cues[i];
+      var d = document.createElement('div');
+      d.className = 'lyr' + (c.sys ? ' sys' : '');
+      d.dataset.i = i;
+      var html = '';
+      if (c.dirs.length) html += '<span class="d">' + esc(c.dirs.join(' ')) + '</span>';
+      html += c.sys ? '<span class="sys">【系统】' + esc(c.text) + '</span>' : esc(c.text);
+      d.innerHTML = html;
+      frag.appendChild(d);
+    }
+    box.appendChild(frag);
+    lastLyricIdx = -2;
+    lastLyricGhost = false;
+  }
+
+  function recenterLyric(i, smooth) {
+    var inner = $('lyricInner');
+    var line = inner.querySelector('.lyr[data-i="' + i + '"]');
+    if (!line) return;
+    var viewH = $('lyricView').clientHeight || 0;
+    var y = viewH / 2 - (line.offsetTop + line.offsetHeight / 2);
+    inner.style.transition = smooth === false ? 'none' : '';
+    inner.style.transform = 'translateY(' + y + 'px)';
+    if (smooth === false) {
+      void inner.offsetHeight;
+      inner.style.transition = '';
+    }
+  }
+
+  function renderLyric(t) {
+    if (!cues.length) return;
+    var i = findCue(t);
+    var ghost = false;
+    if (i < 0) {
+      i = prevIndex(t);
+      if (i >= 0) ghost = true;
+    }
+    if (i < 0) { i = 0; ghost = true; }   // 播放前：预显示第一句
+
+    if (i !== lastLyricIdx || ghost !== lastLyricGhost) {
+      var box = $('lyricInner');
+      var old = box.querySelector('.lyr.cur');
+      if (old) old.classList.remove('cur', 'ghost');
+      var el = box.querySelector('.lyr[data-i="' + i + '"]');
+      if (el) el.classList.add('cur');
+      if (el && ghost) el.classList.add('ghost');
+      if (el) recenterLyric(i, lastLyricIdx !== -2);
+      lastLyricIdx = i;
+      lastLyricGhost = ghost;
+    }
+  }
+
+  function bigHtml(c) {
+    var html = '';
+    if (c.dirs.length) html += '<span class="bigDir">' + esc(c.dirs.join(' ')) + '</span>';
+    html += c.sys ? '<span class="sys">【系统】' + esc(c.text) + '</span>' : esc(c.text);
+    return html;
+  }
+
+  function renderBig(t) {
+    var box = $('bigText');
+    if (!cues.length) return;
+    var i = findCue(t);
+    var ghost = false, pre = false, opacity = 1;
+
+    if (i < 0) {
+      i = prevIndex(t);
+      if (i >= 0) {
+        ghost = true;
+        var end = cues[i].end + offset;
+        var gap = Math.max(0, t - end);
+        opacity = Math.max(0.06, 1 - gap / lingerSec);
+      } else {
+        i = 0; ghost = true; pre = true; opacity = 0.22;
+      }
+    }
+
+    if (i !== lastBigIdx) {
+      box.innerHTML = bigHtml(cues[i]);
+      lastBigIdx = i;
+    }
+    box.style.opacity = opacity;
+    box.style.transform = 'translateY(' + (ghost && !pre ? 4 : 0) + 'px)';
+  }
+
+  function refreshStage(t) {
+    if (mode === 'lyric') {
+      $('lyricView').style.display = '';
+      $('bigView').style.display = 'none';
+      renderLyric(t);
+    } else {
+      $('lyricView').style.display = 'none';
+      $('bigView').style.display = '';
+      renderBig(t);
+      lastLyricIdx = -2;
+    }
+  }
+
+  function setMode(m) {
+    mode = m;
+    var btns = document.querySelectorAll('#modeSeg button');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].dataset.mode === m);
+    lastBigIdx = -1;
+    lastLyricIdx = -2;
+    refreshStage(audio.currentTime || 0);
+  }
+
+  // ---------- 系统终端 ----------
+  function termAppend(kind, time, msg) {
+    var term = $('term');
+    var cur = term.querySelector('.cursor');
+    var line = document.createElement('div');
+    line.className = 'tline ' + kind;
+    line.innerHTML = '<span class="ts">[' + esc(fmt(time)) + ']</span>' +
+                     '<span class="msg">' + esc(msg) + '</span>';
+    term.insertBefore(line, cur);
+    term.scrollTop = term.scrollHeight;
+  }
+
+  function classifySys(text) {
+    if (/错误|失败|重大|故障|损伤|危险/.test(text)) return 'err';
+    if (/警告|异常|警告|注意/.test(text)) return 'warn';
+    return 'sys';
+  }
+
+  function logSystemCue(i) {
+    if (loggedSystem[i]) return;
+    loggedSystem[i] = true;
+    var c = cues[i];
+    termAppend(classifySys(c.text), c.start + offset, c.text.replace(/\n/g, ' '));
+  }
+
+  function logInfo(msg, time) {
+    termAppend('info', time == null ? 0 : time, msg);
+  }
+
+  // ---------- 进度 / 主循环 ----------
+  function tick() {
+    var t = audio.currentTime || 0;
+    $('cur').textContent = fmtLong(t);
+    var dur = audio.duration || 0;
+    if (dur && !dragging) {
+      var p = Math.min(100, t / dur * 100);
+      $('fill').style.width = p + '%';
+      $('head').style.left = p + '%';
+    }
+    var i = findCue(t);
+    markActive(i, true);
+    refreshStage(t);
+    if (i >= 0 && cues[i] && cues[i].sys) logSystemCue(i);
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function startLoop() {
+    if (rafId === null) rafId = requestAnimationFrame(tick);
+  }
+  function stopLoop() {
+    if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+  }
+
+  // ---------- 载入 ----------
+  function loadAudio(file) {
+    if (!file) return;
+    audio.src = URL.createObjectURL(file);
+    $('meta').textContent = file.name + ' · ' + (file.size / 1048576).toFixed(1) + ' MB';
+    $('playBig').classList.remove('disabled');
+    audio.load();
+    logInfo('音频流已接入：' + file.name, 0);
+  }
+
+  function loadSubs(name, txt) {
+    cues = parseSubs(name, txt);
+    loggedSystem = Object.create(null);
+    lastBigIdx = -1;
+    lastLyricIdx = -2;
+    lastLyricGhost = false;
+    $('bigText').innerHTML = '<span class="emptyHint">载入音频与字幕开始预览</span>';
+    renderList();
+    buildLyric();
+    $('meta').textContent = name + ' · ' + cues.length + ' 条字幕';
+    $('nowTag').textContent = cues.length ? '就绪 · ' + cues.length + ' 条' : '未载入';
+    $('term').querySelectorAll('.tline').forEach(function (n) { n.remove(); });
+    logInfo('字幕单元已接入：' + name, 0);
+    logInfo('解析完成 · ' + cues.length + ' 条指令', 0);
+    if (audio.duration) renderMarks();
+    refreshStage(audio.currentTime || 0);
+    var i = findCue(audio.currentTime || 0);
+    markActive(i, false);
+  }
+
+  function readFile(file, cb) {
+    var r = new FileReader();
+    r.onload = function () { cb(r.result); };
+    r.readAsText(file, 'utf-8');
+  }
+
+  function seekTo(t, play) {
+    if (!isFinite(t)) return;
+    audio.currentTime = Math.max(0, Math.min(audio.duration || t, t));
+    lastBigIdx = -1;
+    lastLyricIdx = -2;
+    refreshStage(audio.currentTime);
+    markActive(findCue(audio.currentTime), true);
+    if (play && audio.paused) audio.play().catch(function () {});
+  }
+
+  // ---------- 事件：文件 ----------
+  $('audioFile').addEventListener('change', function (e) { loadAudio(e.target.files[0]); });
+  $('subFile').addEventListener('change', function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    readFile(f, function (t) { loadSubs(f.name, t); });
+  });
+
+  // ---------- 事件：播放 ----------
+  function togglePlay() {
+    if (!audio.src) {
+      flashMeta('请先载入音频文件');
+      return;
+    }
+    if (audio.paused) audio.play().catch(function () {});
+    else audio.pause();
+  }
+  function flashMeta(msg) {
+    var m = $('meta');
+    var old = m.textContent;
+    m.textContent = msg;
+    setTimeout(function () { if (m.textContent === msg) m.textContent = old; }, 1800);
+  }
+
+  $('playBig').addEventListener('click', function (e) { e.stopPropagation(); togglePlay(); });
+  $('stage').addEventListener('click', function (e) {
+    if (e.target.closest('.stageTop')) return;
+    togglePlay();
+  });
+  audio.addEventListener('play', function () {
+    document.body.classList.add('playing');
+    startLoop();
+  });
+  audio.addEventListener('pause', function () {
+    document.body.classList.remove('playing');
+    tickOnce();
+  });
+  audio.addEventListener('ended', function () {
+    document.body.classList.remove('playing');
+    stopLoop();
+    tickOnce();
+  });
+  audio.addEventListener('loadedmetadata', function () {
+    document.body.classList.add('hasMedia');
+    $('dur').textContent = fmtLong(audio.duration);
+    $('playBig').classList.remove('disabled');
+    renderMarks();
+    refreshStage(audio.currentTime || 0);
+    var q = new URLSearchParams(location.search);
+    var tq = parseFloat(q.get('t') || '0');
+    if (audio.src.indexOf('blob:') !== 0 && tq > 0) audio.currentTime = tq;
+    if (q.get('play') === '1') audio.play().catch(function () {});
+  });
+  audio.addEventListener('timeupdate', function () {
+    if (rafId === null) tickOnce();
+  });
+  audio.addEventListener('progress', function () {
+    try {
+      if (audio.buffered.length && audio.duration) {
+        $('buf').style.width = (audio.buffered.end(audio.buffered.length - 1) / audio.duration * 100) + '%';
+      }
+    } catch (err) {}
+  });
+
+  function tickOnce() {
+    var t = audio.currentTime || 0;
+    $('cur').textContent = fmtLong(t);
+    var dur = audio.duration || 0;
+    if (dur) {
+      $('fill').style.width = (t / dur * 100) + '%';
+      $('head').style.left = (t / dur * 100) + '%';
+    }
+    var i = findCue(t);
+    markActive(i, false);
+    refreshStage(t);
+    if (i >= 0 && cues[i] && cues[i].sys) logSystemCue(i);
+  }
+
+  // ---------- 事件：模式 / 侧栏 ----------
+  var modeBtns = document.querySelectorAll('#modeSeg button');
+  for (var mb = 0; mb < modeBtns.length; mb++) {
+    modeBtns[mb].addEventListener('click', function () { setMode(this.dataset.mode); });
+  }
+  $('btnSide').addEventListener('click', function () {
+    $('side').classList.toggle('hide');
+    this.classList.toggle('on', !$('side').classList.contains('hide'));
+    renderMarks();
+    setTimeout(function () { lastLyricIdx = -2; refreshStage(audio.currentTime || 0); }, 30);
+  });
+  $('btnFollow').addEventListener('click', function () {
+    follow = !follow;
+    this.classList.toggle('on', follow);
+    if (follow) markActive(findCue(audio.currentTime || 0), true);
+  });
+  $('btnFull').addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function () {});
+    else document.exitFullscreen();
+  });
+  $('btnBackCur').addEventListener('click', function (e) {
+    e.stopPropagation();
+    lastLyricIdx = -2;
+    markActive(findCue(audio.currentTime || 0), true);
+    refreshStage(audio.currentTime || 0);
+    this.style.display = 'none';
+  });
+
+  // ---------- 事件：列表选择 + 跳转 ----------
+  var jumpTarget = -1;
+  $('list').addEventListener('click', function (e) {
+    var el = e.target.closest('.cue');
+    if (!el) return;
+    var i = +el.dataset.i;
+    var list = $('list');
+    var prev = list.querySelector('.cue.sel');
+    if (prev) prev.classList.remove('sel');
+    el.classList.add('sel');
+    selected = i;
+    jumpTarget = i;
+    var time = cues[i].start + offset;
+    $('jumpLabel').textContent = '已选中 ' + fmt(time) + (cues[i].sys ? ' · 系统播报' : '');
+    $('jumpBtn').textContent = '跳转到 ' + fmt(time);
+    $('jumpToast').classList.add('show');
+  });
+
+  function hideJump() {
+    $('jumpToast').classList.remove('show');
+    var prev = $('list').querySelector('.cue.sel');
+    if (prev) prev.classList.remove('sel');
+    selected = -1;
+    jumpTarget = -1;
+  }
+
+  $('jumpBtn').addEventListener('click', function () {
+    if (jumpTarget < 0) return;
+    var i = jumpTarget;
+    hideJump();
+    seekTo(cues[i].start + offset + 0.01, true);
+  });
+  $('jumpClose').addEventListener('click', hideJump);
+
+  // ---------- 事件：进度条拖动 + 预览 ----------
+  var seekWrap = $('seekWrap');
+  var seekTip = $('seekTip');
+
+  function tipCueAt(t) {
+    var i = prevIndex(t);
+    if (i < 0) i = 0;
+    if (!cues.length) return '—';
+    var c = cues[i];
+    var label = c.dirs.length ? c.dirs.join(' ') + ' ' : '';
+    return label + (c.sys ? '【系统】' : '') + c.text.replace(/\n/g, ' ');
+  }
+
+  function updatePreview(clientX, show) {
+    if (!audio.duration) return;
+    var r = seekWrap.getBoundingClientRect();
+    var p = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    dragTime = p * audio.duration;
+    $('tipTime').textContent = fmtLong(dragTime);
+    $('tipText').textContent = tipCueAt(dragTime);
+    var px = p * r.width;
+    var half = 100;
+    var left = Math.min(r.width - half, Math.max(half, px));
+    seekTip.style.left = left + 'px';
+    if (show !== false) seekTip.classList.add('show');
+    if (dragging) {
+      $('fill').style.width = (p * 100) + '%';
+      $('head').style.left = (p * 100) + '%';
+    }
+  }
+
+  seekWrap.addEventListener('pointerdown', function (e) {
+    if (!audio.duration) return;
+    dragging = true;
+    seekWrap.classList.add('dragging');
+    try { seekWrap.setPointerCapture(e.pointerId); } catch (err) {}
+    updatePreview(e.clientX, true);
+    e.preventDefault();
+  });
+  seekWrap.addEventListener('pointermove', function (e) {
+    if (!audio.duration) return;
+    updatePreview(e.clientX, true);
+  });
+  seekWrap.addEventListener('pointerup', function (e) {
+    if (!dragging) return;
+    dragging = false;
+    seekWrap.classList.remove('dragging');
+    updatePreview(e.clientX, false);
+    seekTo(dragTime, true);
+    setTimeout(function () { seekTip.classList.remove('show'); }, 500);
+  });
+  seekWrap.addEventListener('pointercancel', function () {
+    dragging = false;
+    seekWrap.classList.remove('dragging');
+    seekTip.classList.remove('show');
+  });
+  seekWrap.addEventListener('pointerleave', function () {
+    if (!dragging) seekTip.classList.remove('show');
+  });
+
+  // ---------- 事件：偏移 / 字号 ----------
+  function applyOffset() {
+    $('offset').textContent = (offset >= 0 ? '+' : '') + offset.toFixed(2);
+    var rows = $('list').children;
+    for (var i = 0; i < rows.length && i < cues.length; i++) {
+      rows[i].querySelector('.t').textContent = fmt(cues[i].start + offset);
+    }
+    renderMarks();
+    lastBigIdx = -1;
+    lastLyricIdx = -2;
+    refreshStage(audio.currentTime || 0);
+    var i2 = findCue(audio.currentTime || 0);
+    markActive(i2, false);
+  }
+  var shiftBtns = document.querySelectorAll('[data-shift]');
+  for (var sb = 0; sb < shiftBtns.length; sb++) {
+    shiftBtns[sb].addEventListener('click', function () {
+      var v = parseFloat(this.dataset.shift);
+      if (v === 0) offset = 0;
+      else offset = Math.round((offset + v) * 100) / 100;
+      applyOffset();
+    });
+  }
+
+  var fontBtns = document.querySelectorAll('[data-font]');
+  for (var fb = 0; fb < fontBtns.length; fb++) {
+    fontBtns[fb].addEventListener('click', function () {
+      var root = document.documentElement;
+      var cur = parseFloat(getComputedStyle(root).getPropertyValue('--big')) || 34;
+      var next = Math.max(20, Math.min(72, cur + parseFloat(this.dataset.font)));
+      root.style.setProperty('--big', next + 'px');
+      lastBigIdx = -1;
+    });
+  }
+
+  // ---------- 事件：搜索 ----------
+  $('search').addEventListener('input', function () {
+    var q = this.value.trim().toLowerCase();
+    var rows = $('list').children;
+    for (var i = 0; i < rows.length; i++) {
+      var hit = q && rows[i].dataset.text.indexOf(q) >= 0;
+      rows[i].classList.toggle('hit', !!hit);
+      rows[i].classList.toggle('hide', !!(q && !hit));
+    }
+  });
+
+  // ---------- 事件：键盘 ----------
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT') return;
+    var k = e.key;
+    if (k === ' ' || k === 'Spacebar') {
+      e.preventDefault(); togglePlay();
+    } else if (k === 'ArrowLeft') {
+      e.preventDefault(); seekTo((audio.currentTime || 0) - 5, false);
+    } else if (k === 'ArrowRight') {
+      e.preventDefault(); seekTo((audio.currentTime || 0) + 5, false);
+    } else if (k === 'ArrowUp') {
+      e.preventDefault(); jumpCue(-1);
+    } else if (k === 'ArrowDown') {
+      e.preventDefault(); jumpCue(1);
+    } else if (k === 'f' || k === 'F') {
+      e.preventDefault();
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function () {});
+      else document.exitFullscreen();
+    } else if (k === 'm' || k === 'M') {
+      setMode(mode === 'lyric' ? 'big' : 'lyric');
+    } else if (k === 'Enter' && jumpTarget >= 0) {
+      $('jumpBtn').click();
+    } else if (k === 'Escape') {
+      hideJump();
+    }
+  });
+
+  function jumpCue(dir) {
+    var t = audio.currentTime || 0;
+    var i = findCue(t);
+    var target;
+    if (i < 0) {
+      target = dir > 0 ? nextIndex(t) : prevIndex(t);
+    } else {
+      target = i + dir;
+    }
+    if (target >= 0 && target < cues.length) seekTo(cues[target].start + offset + 0.01, false);
+  }
+  $('btnPrev').addEventListener('click', function () { jumpCue(-1); });
+  $('btnNext').addEventListener('click', function () { jumpCue(1); });
+
+  // ---------- 终端清空 ----------
+  $('termClear').addEventListener('click', function () {
+    $('term').querySelectorAll('.tline').forEach(function (n) { n.remove(); });
+    loggedSystem = Object.create(null);
+    logInfo('终端已清空', audio.currentTime || 0);
+  });
+
+  // ---------- 拖放 ----------
+  var drop = $('drop');
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    window.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('show'); });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    window.addEventListener(ev, function (e) {
+      e.preventDefault();
+      if (ev === 'dragleave' && e.clientX > 0 && e.clientY > 0) return;
+      drop.classList.remove('show');
+    });
+  });
+  window.addEventListener('drop', function (e) {
+    var fs = e.dataTransfer && e.dataTransfer.files;
+    if (!fs) return;
+    for (var i = 0; i < fs.length; i++) {
+      var f = fs[i], n = f.name.toLowerCase();
+      if (/\.(mp3|wav|ogg|m4a|flac|aac|opus|mp4|webm)$/.test(n)) loadAudio(f);
+      else if (/\.(srt|lrc|vtt|txt)$/.test(n)) {
+        (function (file) { readFile(file, function (t) { loadSubs(file.name, t); }); })(f);
+      }
+    }
+  });
+
+  // ---------- 初始 ----------
+  (function autoLoad() {
+    var q = new URLSearchParams(location.search);
+    var a = q.get('a'), s = q.get('s') || (document.body.getAttribute('data-default-subs') || '');
+    var m = q.get('mode');
+    if (m === 'big' || m === 'lyric') setMode(m);
+    if (a) {
+      audio.src = a;
+      $('meta').textContent = a.split('/').pop();
+      $('playBig').classList.remove('disabled');
+      audio.load();
+    }
+    if (s) {
+      function apply(txt) {
+        loadSubs(s.split('/').pop(), txt);
+      }
+      function afterLoad() {
+        var t = parseFloat(q.get('t') || '0');
+        if (t > 0) {
+          if (audio.readyState >= 1) seekTo(t, false);
+          else audio.addEventListener('loadedmetadata', function once() {
+            audio.removeEventListener('loadedmetadata', once);
+            seekTo(t, false);
+          });
+        }
+      }
+      function tryLoad(url, fallback) {
+        fetch(url).then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.text();
+        }).then(function (txt) {
+          apply(txt);
+          afterLoad();
+        }).catch(function () {
+          if (fallback) tryLoad('/' + s.replace(/^\/+/, ''), false);
+          else $('meta').textContent = '字幕读取失败：' + s;
+        });
+      }
+      tryLoad(s, s.charAt(0) !== '/');
+    }
+    // 单文件版：使用内嵌的字幕与音频
+    var emb = document.getElementById('embeddedSubs');
+    if (!s && emb) {
+      loadSubs(emb.getAttribute('data-name') || '内置字幕', emb.textContent);
+      if (audio.getAttribute('src')) {
+        $('playBig').classList.remove('disabled');
+        $('meta').textContent = '内置音频 · ' + cues.length + ' 条字幕';
+      }
+    }
+    logInfo('播放器已启动', 0);
+    logInfo('提示：拖入音频与 LRC / SRT 文件即可预览', 0);
+  })();
+
+  setMode(mode);
+  refreshStage(0);
+})();
+</script>
+</body>
+</html>
